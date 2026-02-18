@@ -71,7 +71,7 @@ public final class MenuListener implements Listener {
 
             if (m == Material.CHEST) {
                 // Bank balance placeholder = 0 for now; Vault hook later
-                var inv = Menus.vaultMenu(g, 0);
+                var inv = Menus.vaultMenu(g, g.getBankBalance());
                 // load vault items into slots 9..53
                 var items = plugin.vaults().loadVault(g.getId());
                 for (int i = 0; i < 45; i++) {
