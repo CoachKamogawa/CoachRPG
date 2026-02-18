@@ -154,6 +154,10 @@ public final class Storage {
         return playersById.computeIfAbsent(uuid, PlayerData::new);
     }
 
+    public Collection<PlayerData> allPlayerData() {
+        return Collections.unmodifiableCollection(playersById.values());
+    }
+
     public Guild getGuild(String guildId) {
         return guildsById.get(guildId);
     }
@@ -190,5 +194,9 @@ public final class Storage {
         pd.setGuildId(id);
 
         return g;
+    }
+
+    public void deleteGuild(String guildId) {
+        guildsById.remove(guildId);
     }
 }
