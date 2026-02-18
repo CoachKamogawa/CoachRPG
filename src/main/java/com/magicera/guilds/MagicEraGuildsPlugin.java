@@ -6,7 +6,10 @@ import com.magicera.guilds.commands.AlignmentCommand;
 import com.magicera.guilds.commands.DuelCommand;
 import com.magicera.guilds.commands.GuildCommand;
 import com.magicera.guilds.commands.PartyCommand;
+import com.magicera.guilds.gui.MenuListener;
 import com.magicera.guilds.guilds.InviteManager;
+import com.magicera.guilds.guilds.VaultManager;
+import com.magicera.guilds.listeners.PlayerSeenListener;
 import com.magicera.guilds.storage.Storage;
 import org.bukkit.Bukkit;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -16,10 +19,12 @@ public final class MagicEraGuildsPlugin extends JavaPlugin {
     private Storage storage;
     private AlignmentWatcher alignmentWatcher;
     private InviteManager inviteManager;
+    private VaultManager vaults;
 
     public Storage storage() { return storage; }
     public AlignmentWatcher alignmentWatcher() { return alignmentWatcher; }
     public InviteManager inviteManager() { return inviteManager; }
+    public VaultManager vaults() { return vaults; }
 
     @Override
     public void onEnable() {
@@ -30,12 +35,17 @@ public final class MagicEraGuildsPlugin extends JavaPlugin {
             storage.load();
 
             inviteManager = new InviteManager(this);
+            vaults = new VaultManager(this);
 
             // Commands
             if (getCommand("guild") != null) getCommand("guild").setExecutor(new GuildCommand(this));
             if (getCommand("party") != null) getCommand("party").setExecutor(new PartyCommand(this));
             if (getCommand("duel") != null) getCommand("duel").setExecutor(new DuelCommand(this));
             if (getCommand("alignment") != null) getCommand("alignment").setExecutor(new AlignmentCommand(this));
+
+            // Listeners
+            Bukkit.getPluginManager().registerEvents(new MenuListener(this), this);
+            Bukkit.getPluginManager().registerEvents(new PlayerSeenListener(this), this);
 
             // Auto-save
             int intervalSeconds = Math.max(30, getConfig().getInt("data.save-interval-seconds", 120));
