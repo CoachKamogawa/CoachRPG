@@ -14,7 +14,10 @@ import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.inventory.meta.SkullMeta;
 
 import java.time.Duration;
-import java.util.*;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 
 public final class Menus {
 
@@ -37,25 +40,16 @@ public final class Menus {
 
         if (g != null) {
             inv.setItem(11, item(Material.BOOK, "§bYour Guild", lore(
-                    "§7Name: §r" + g.getName(),
+                    "§7Name: §r" + Text.color(g.getName()),
                     "§7Tag: §7[" + g.getPrefix() + "§7]",
                     "§7Alignment: §f" + g.getAlignment().name(),
                     "",
                     "§eClick to open"
             )));
-            inv.setItem(15, item(Material.NETHER_STAR, "§bAlignment", lore(
-                    "§7Guild Alignment:",
-                    "§f" + g.getAlignment().name(),
-                    "",
-                    "§eClick to view"
-            )));
         } else {
             inv.setItem(11, item(Material.BARRIER, "§bYour Guild", lore(
                     "§cYou are not in a guild.",
                     "§7Use §f/guild create \"Name\" TAG"
-            )));
-            inv.setItem(15, item(Material.GRAY_DYE, "§bAlignment", lore(
-                    "§7Join a guild first."
             )));
         }
 
@@ -63,41 +57,12 @@ public final class Menus {
                 "§7Placeholder for now."
         )));
 
-        return inv;
-    }
-
-    /**
-     * Used by /align and by the Guild Menu "Alignment" button.
-     * This is currently informational only (click logic handled in MenuListener if you add it).
-     */
-    public static Inventory alignmentMenu(MagicEraGuildsPlugin plugin, UUID viewer) {
-        PlayerData pd = plugin.storage().getOrCreatePlayer(viewer);
-
-        Inventory inv = Bukkit.createInventory(null, 27, TITLE_ALIGNMENT);
-
-        for (int i = 0; i < 9; i++) inv.setItem(i, backPane());
-        for (int i = 9; i < 27; i++) inv.setItem(i, filler());
-
-        inv.setItem(11, item(Material.LIME_WOOL, "§aHonorable", lore(
-                "§7Score range: §f50 to 100",
-                "§7Current score: §f" + pd.getAlignmentScore()
-        )));
-
-        inv.setItem(13, item(Material.GRAY_WOOL, "§7Neutral", lore(
-                "§7Score range: §f-49 to 49",
-                "§7Current score: §f" + pd.getAlignmentScore()
-        )));
-
-        inv.setItem(15, item(Material.RED_WOOL, "§cDark", lore(
-                "§7Score range: §f-100 to -50",
-                "§7Current score: §f" + pd.getAlignmentScore()
-        )));
-
-        inv.setItem(22, item(Material.PAPER, "§bYour Alignment", lore(
-                "§7Alignment score is always tracked",
-                "§7even outside a guild.",
+        // Alignment always accessible
+        int score = pd.getAlignmentScore();
+        inv.setItem(15, item(Material.NETHER_STAR, "§bAlignment", lore(
+                "§7Your Alignment Score: §f" + score,
                 "",
-                "§7Score: §f" + pd.getAlignmentScore()
+                "§eClick to open"
         )));
 
         return inv;
@@ -121,7 +86,7 @@ public final class Menus {
         return inv;
     }
 
-    // 54 slots: top row is UI bar, remaining 45 slots are storage (index 9..53)
+    // 54 slots: top row UI bar, remaining 45 slots storage (index 9..53)
     public static Inventory vaultMenu(Guild g, double bankBalance) {
         Inventory inv = Bukkit.createInventory(null, 54, TITLE_VAULT);
 
@@ -182,6 +147,93 @@ public final class Menus {
         )));
 
         return inv;
+    }
+
+    /**
+     * Alignment Menu: always available (guild not required)
+     * Center head + 5 "pips" per side.
+     *
+     * Visual note: Minecraft rows are 9 wide, so we represent 5-per-side
+     * as 4 on the center row + 1 just below on each side.
+     */
+    public static Inventory alignmentMenu(MagicEraGuildsPlugin plugin, UUID viewer) {
+        PlayerData pd = plugin.storage().getOrCreatePlayer(viewer);
+        int score = pd.getAlignmentScore(); // -100..100
+
+        Inventory inv = Bukkit.createInventory(null, 27, TITLE_ALIGNMENT);
+
+        // top bar: go back
+        for (int i = 0; i < 9; i++) inv.setItem(i, backPane());
+        for (int i = 9; i < 27; i++) inv.setItem(i, filler());
+
+        // center player head
+        inv.setItem(13, playerHead(Bukkit.getOfflinePlayer(viewer), score));
+
+        // 5 pips each side (4 in row, 1 below)
+        int[] leftSlots = { 12, 11, 10, 9, 21 };   // dark side
+        int[] rightSlots = { 14, 15, 16, 17, 23 }; // honorable side
+
+        int redCount = calcNegativePips(score);
+        int greenCount = calcPositivePips(score);
+
+        for (int i = 0; i < leftSlots.length; i++) {
+            boolean filled = i < redCount;
+            inv.setItem(leftSlots[i], item(
+                    filled ? Material.RED_STAINED_GLASS_PANE : Material.WHITE_STAINED_GLASS_PANE,
+                    filled ? "§cDark" : "§f",
+                    null
+            ));
+        }
+
+        for (int i = 0; i < rightSlots.length; i++) {
+            boolean filled = i < greenCount;
+            inv.setItem(rightSlots[i], item(
+                    filled ? Material.LIME_STAINED_GLASS_PANE : Material.WHITE_STAINED_GLASS_PANE,
+                    filled ? "§aHonorable" : "§f",
+                    null
+            ));
+        }
+
+        // info card
+        inv.setItem(22, item(Material.PAPER, "§bAlignment Info", lore(
+                "§7Score: §f" + score,
+                "",
+                "§7-100 to -50 = §cDark",
+                "§7-49 to 49 = §7Neutral",
+                "§750 to 100 = §aHonorable"
+        )));
+
+        return inv;
+    }
+
+    private static int calcPositivePips(int score) {
+        if (score <= 0) return 0;
+        if (score >= 100) return 5;
+        return (int) Math.ceil(score / 20.0); // 1-20=1 ... 81-100=5
+    }
+
+    private static int calcNegativePips(int score) {
+        if (score >= 0) return 0;
+        if (score <= -100) return 5;
+        return (int) Math.ceil(Math.abs(score) / 20.0);
+    }
+
+    private static ItemStack playerHead(OfflinePlayer player, int score) {
+        ItemStack head = new ItemStack(Material.PLAYER_HEAD);
+        ItemMeta meta = head.getItemMeta();
+        if (meta instanceof SkullMeta sm) {
+            sm.setOwningPlayer(player);
+            sm.setDisplayName("§bYour Alignment");
+
+            String group = score >= 50 ? "§aHonorable" : (score <= -50 ? "§cDark" : "§7Neutral");
+
+            sm.setLore(lore(
+                    "§7Score: §f" + score,
+                    "§7Status: " + group
+            ));
+            head.setItemMeta(sm);
+        }
+        return head;
     }
 
     private static String formatLastOnline(boolean isOnline, long lastSeenMs) {
