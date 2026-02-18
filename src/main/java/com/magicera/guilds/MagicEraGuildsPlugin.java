@@ -44,31 +44,47 @@ public final class MagicEraGuildsPlugin extends JavaPlugin {
             economyHook = new EconomyHook();
             boolean econOk = economyHook.setup();
 
+            // -------------------------
             // Commands
+            // -------------------------
             if (getCommand("guild") != null) getCommand("guild").setExecutor(new GuildCommand(this));
             if (getCommand("party") != null) getCommand("party").setExecutor(new PartyCommand(this));
             if (getCommand("duel") != null) getCommand("duel").setExecutor(new DuelCommand(this));
             if (getCommand("alignment") != null) getCommand("alignment").setExecutor(new AlignmentCommand(this));
 
+            // -------------------------
             // Listeners
+            // -------------------------
+
+            // GUI listener (handles /guild menu and /align menus)
             Bukkit.getPluginManager().registerEvents(new MenuListener(this), this);
+
+            // Player last-seen tracking
             Bukkit.getPluginManager().registerEvents(new PlayerSeenListener(this), this);
 
+            // Alignment join check
+            alignmentWatcher = new AlignmentWatcher(this);
+            Bukkit.getPluginManager().registerEvents(new JoinListener(alignmentWatcher), this);
+
+            // -------------------------
             // Auto-save
+            // -------------------------
             int intervalSeconds = Math.max(30, getConfig().getInt("data.save-interval-seconds", 120));
             Bukkit.getScheduler().runTaskTimerAsynchronously(this, () -> {
                 try { storage.save(); } catch (Exception ignored) {}
             }, 20L * intervalSeconds, 20L * intervalSeconds);
 
-            // Alignment watcher
-            alignmentWatcher = new AlignmentWatcher(this);
-            Bukkit.getPluginManager().registerEvents(new JoinListener(alignmentWatcher), this);
-
+            // -------------------------
+            // Alignment warning task
+            // -------------------------
             int warnMinutes = Math.max(1, getConfig().getInt("alignment.warn-interval-minutes", 30));
             Bukkit.getScheduler().runTaskTimer(this, alignmentWatcher,
                     20L * 60L * warnMinutes,
                     20L * 60L * warnMinutes);
 
+            // -------------------------
+            // Startup log
+            // -------------------------
             getLogger().info("====================================");
             getLogger().info("MagicEraGuilds loaded successfully");
             getLogger().info("Author: Coach Kamogawa");
