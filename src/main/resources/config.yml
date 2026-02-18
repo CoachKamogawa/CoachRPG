@@ -1,0 +1,16 @@
+# Foundation config (we'll expand later)
+data:
+  save-interval-seconds: 120
+
+guilds:
+  inactivity-autodisbands-days: 30
+
+claims:
+  leader-start-chunks: 4
+  power-max-per-player: 15
+  member-chunks-per-10-power: 1
+  chunk-cost: 75
+
+economy:
+  enabled: true
+  vault-required: true
