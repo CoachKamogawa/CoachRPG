@@ -64,6 +64,12 @@ public final class Storage {
 
                 Guild guild = new Guild(guildId, name, prefix, alignment);
 
+                // NEW fields
+                guild.setBankBalance(s.getDouble("bankBalance", 0.0));
+                guild.setTaxPercent(s.getInt("taxPercent", 0));
+                guild.setOfficerWithdrawUsed24h(s.getDouble("officerWithdrawUsed24h", 0.0));
+                guild.setOfficerWithdrawWindowStartMs(s.getLong("officerWithdrawWindowStartMs", 0L));
+
                 ConfigurationSection mem = s.getConfigurationSection("members");
                 if (mem != null) {
                     for (String uuidStr : mem.getKeys(false)) {
@@ -123,6 +129,12 @@ public final class Storage {
             guildsYaml.set(base + ".name", g.getName());
             guildsYaml.set(base + ".prefix", g.getPrefix());
             guildsYaml.set(base + ".alignment", g.getAlignment().name());
+
+            // NEW fields
+            guildsYaml.set(base + ".bankBalance", g.getBankBalance());
+            guildsYaml.set(base + ".taxPercent", g.getTaxPercent());
+            guildsYaml.set(base + ".officerWithdrawUsed24h", g.getOfficerWithdrawUsed24h());
+            guildsYaml.set(base + ".officerWithdrawWindowStartMs", g.getOfficerWithdrawWindowStartMs());
 
             String memBase = base + ".members";
             guildsYaml.set(memBase, null);
@@ -185,7 +197,7 @@ public final class Storage {
 
     public Guild createGuild(String rawName, String rawPrefix, UUID masterUuid) {
         String id = Text.normalizeId(rawName);
-        String name = Text.color(rawName);   // <- color codes preserved
+        String name = Text.color(rawName);
         String prefix = Text.color(rawPrefix);
 
         Guild g = new Guild(id, name, prefix, GuildAlignment.NEUTRAL);
