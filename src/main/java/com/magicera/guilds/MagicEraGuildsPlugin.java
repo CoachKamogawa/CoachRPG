@@ -6,6 +6,7 @@ import com.magicera.guilds.commands.AlignmentCommand;
 import com.magicera.guilds.commands.DuelCommand;
 import com.magicera.guilds.commands.GuildCommand;
 import com.magicera.guilds.commands.PartyCommand;
+import com.magicera.guilds.guilds.InviteManager;
 import com.magicera.guilds.storage.Storage;
 import org.bukkit.Bukkit;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -14,14 +15,11 @@ public final class MagicEraGuildsPlugin extends JavaPlugin {
 
     private Storage storage;
     private AlignmentWatcher alignmentWatcher;
+    private InviteManager inviteManager;
 
-    public Storage storage() {
-        return storage;
-    }
-
-    public AlignmentWatcher alignmentWatcher() {
-        return alignmentWatcher;
-    }
+    public Storage storage() { return storage; }
+    public AlignmentWatcher alignmentWatcher() { return alignmentWatcher; }
+    public InviteManager inviteManager() { return inviteManager; }
 
     @Override
     public void onEnable() {
@@ -30,6 +28,8 @@ public final class MagicEraGuildsPlugin extends JavaPlugin {
 
             storage = new Storage(this);
             storage.load();
+
+            inviteManager = new InviteManager(this);
 
             // Commands
             if (getCommand("guild") != null) getCommand("guild").setExecutor(new GuildCommand(this));
@@ -43,7 +43,7 @@ public final class MagicEraGuildsPlugin extends JavaPlugin {
                 try { storage.save(); } catch (Exception ignored) {}
             }, 20L * intervalSeconds, 20L * intervalSeconds);
 
-            // Alignment watcher (store instance)
+            // Alignment watcher (stored instance)
             alignmentWatcher = new AlignmentWatcher(this);
             Bukkit.getPluginManager().registerEvents(new JoinListener(alignmentWatcher), this);
 
