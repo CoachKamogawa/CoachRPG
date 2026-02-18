@@ -13,9 +13,14 @@ import org.bukkit.plugin.java.JavaPlugin;
 public final class MagicEraGuildsPlugin extends JavaPlugin {
 
     private Storage storage;
+    private AlignmentWatcher alignmentWatcher;
 
     public Storage storage() {
         return storage;
+    }
+
+    public AlignmentWatcher alignmentWatcher() {
+        return alignmentWatcher;
     }
 
     @Override
@@ -38,12 +43,14 @@ public final class MagicEraGuildsPlugin extends JavaPlugin {
                 try { storage.save(); } catch (Exception ignored) {}
             }, 20L * intervalSeconds, 20L * intervalSeconds);
 
-            // Alignment watcher
-            AlignmentWatcher watcher = new AlignmentWatcher(this);
-            Bukkit.getPluginManager().registerEvents(new JoinListener(watcher), this);
+            // Alignment watcher (store instance)
+            alignmentWatcher = new AlignmentWatcher(this);
+            Bukkit.getPluginManager().registerEvents(new JoinListener(alignmentWatcher), this);
 
             int warnMinutes = Math.max(1, getConfig().getInt("alignment.warn-interval-minutes", 30));
-            Bukkit.getScheduler().runTaskTimer(this, watcher, 20L * 60L * warnMinutes, 20L * 60L * warnMinutes);
+            Bukkit.getScheduler().runTaskTimer(this, alignmentWatcher,
+                    20L * 60L * warnMinutes,
+                    20L * 60L * warnMinutes);
 
             getLogger().info("====================================");
             getLogger().info("MagicEraGuilds loaded successfully");
