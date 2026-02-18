@@ -14,6 +14,7 @@ import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 
+import java.util.List;
 import java.util.UUID;
 
 public final class GuildCommand implements CommandExecutor {
@@ -28,7 +29,8 @@ public final class GuildCommand implements CommandExecutor {
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
 
         if (args.length == 0) {
-            sender.sendMessage("§7/guild create <name> <displayName>");
+            sender.sendMessage("§7/guild create \"<name>\" <displayName>");
+            sender.sendMessage("§7Example: §f/guild create \"White Rose\" &aWR");
             sender.sendMessage("§7/guild invite <player>");
             sender.sendMessage("§7/guild accept");
             sender.sendMessage("§7/guild deny");
@@ -55,8 +57,11 @@ public final class GuildCommand implements CommandExecutor {
                 sender.sendMessage("§cPlayers only.");
                 return true;
             }
-            if (args.length < 3) {
-                sender.sendMessage("§cUsage: /guild create <name> <displayName>");
+
+            ParsedCreate parsed = parseCreateArgs(args);
+            if (parsed == null) {
+                sender.sendMessage("§cUsage: /guild create \"<name>\" <displayName>");
+                sender.sendMessage("§cExample: /guild create \"White Rose\" &aWR");
                 return true;
             }
 
@@ -66,8 +71,8 @@ public final class GuildCommand implements CommandExecutor {
                 return true;
             }
 
-            String rawName = args[1];
-            String rawPrefix = args[2];
+            String rawName = parsed.guildName;     // can include spaces + colors
+            String rawPrefix = parsed.displayName; // 2-4 chars, colors allowed
 
             String id = Text.normalizeId(rawName);
             if (id.isEmpty()) {
@@ -150,12 +155,9 @@ public final class GuildCommand implements CommandExecutor {
                 return true;
             }
 
-            // Alignment enforcement at invite time:
             GuildAlignment guildAlign = guild.getAlignment();
             GuildAlignment targetAlign = AlignmentUtil.groupFromScore(targetData.getAlignmentScore());
 
-            // If target is neutral, allow invite (they'll snap on accept)
-            // If not neutral, must match guild alignment
             if (targetAlign != GuildAlignment.NEUTRAL && targetAlign != guildAlign) {
                 sender.sendMessage("§cThat player is out of alignment and cannot join this guild.");
                 return true;
@@ -166,7 +168,6 @@ public final class GuildCommand implements CommandExecutor {
             sender.sendMessage("§aInvited §f" + target.getName() + " §ato §r" + guild.getName() + " §7[" + guild.getPrefix() + "§7]");
             target.sendMessage("§7[§bMagicEra§7] §fYou were invited to join §r" + guild.getName() + " §7[" + guild.getPrefix() + "§7]");
             target.sendMessage("§7Type §a/guild accept §7or §c/guild deny");
-
             return true;
         }
 
@@ -204,12 +205,10 @@ public final class GuildCommand implements CommandExecutor {
                 return true;
             }
 
-            // ACCEPT: enforce alignment again + apply neutral auto-snap
             GuildAlignment guildAlign = guild.getAlignment();
             GuildAlignment playerAlign = AlignmentUtil.groupFromScore(pd.getAlignmentScore());
 
             if (playerAlign == GuildAlignment.NEUTRAL && guildAlign != GuildAlignment.NEUTRAL) {
-                // Neutral joining non-neutral guild => snap alignment score
                 int snapped = AlignmentUtil.snapScoreToGuild(guildAlign);
                 pd.setAlignmentScore(snapped);
                 playerAlign = AlignmentUtil.groupFromScore(pd.getAlignmentScore());
@@ -230,9 +229,11 @@ public final class GuildCommand implements CommandExecutor {
             plugin.storage().save();
 
             sender.sendMessage("§aYou joined §r" + guild.getName() + " §7[" + guild.getPrefix() + "§7]");
-            Bukkit.broadcastMessage("§7[§bMagicEra§7] §f" + player.getName() + " §7joined §r" + guild.getName());
 
-            // Immediately re-check alignment status (should be fine)
+            // Server announcement format requested:
+            // </aqua>[Magic Era] </white><player> has joined <guild name with color codes></white>.
+            Bukkit.broadcastMessage("§b[Magic Era] §f" + player.getName() + " has joined " + Text.color(guild.getName()) + "§f.");
+
             if (plugin.alignmentWatcher() != null) {
                 plugin.alignmentWatcher().checkAndWarn(player, false);
             }
@@ -266,7 +267,6 @@ public final class GuildCommand implements CommandExecutor {
                 return true;
             }
 
-            // Clear guildId for every member (FIXED LOOP)
             for (UUID memberId : g.getMembers().keySet()) {
                 PlayerData mpd = plugin.storage().getOrCreatePlayer(memberId);
                 if (g.getId().equals(mpd.getGuildId())) {
@@ -275,7 +275,6 @@ public final class GuildCommand implements CommandExecutor {
                 }
             }
 
-            // Delete guild
             plugin.storage().deleteGuild(g.getId());
             plugin.storage().save();
 
@@ -285,5 +284,79 @@ public final class GuildCommand implements CommandExecutor {
 
         sender.sendMessage("§cUnknown subcommand.");
         return true;
+    }
+
+    // ----- helpers -----
+
+    private static final class ParsedCreate {
+        final String guildName;
+        final String displayName;
+        ParsedCreate(String guildName, String displayName) {
+            this.guildName = guildName;
+            this.displayName = displayName;
+        }
+    }
+
+    /**
+     * Accepts:
+     *  /guild create "Name With Spaces" &aWR
+     *  /guild create 'Name With Spaces' &aWR
+     */
+    private ParsedCreate parseCreateArgs(String[] args) {
+        if (args.length < 3) return null;
+
+        // If name is quoted, join tokens until closing quote.
+        String second = args[1];
+        if (startsWithQuote(second)) {
+            String quote = second.substring(0, 1); // " or '
+            StringBuilder name = new StringBuilder(stripLeadingQuote(second));
+
+            int i = 2;
+            boolean closed = endsWithQuote(args[1]) && args[1].length() > 1;
+            if (closed) {
+                name = new StringBuilder(stripTrailingQuote(stripLeadingQuote(second)));
+                i = 2;
+            } else {
+                while (i < args.length) {
+                    name.append(" ").append(args[i]);
+                    if (endsWithQuote(args[i])) {
+                        closed = true;
+                        break;
+                    }
+                    i++;
+                }
+            }
+
+            if (!closed) return null;
+
+            String rawName = stripTrailingQuote(name.toString());
+            int prefixIndex = i + 1;
+            if (prefixIndex >= args.length) return null;
+
+            String rawPrefix = args[prefixIndex];
+            return new ParsedCreate(rawName, rawPrefix);
+        }
+
+        // No quotes: old behavior (no spaces)
+        if (args.length < 3) return null;
+        return new ParsedCreate(args[1], args[2]);
+    }
+
+    private boolean startsWithQuote(String s) {
+        return s.startsWith("\"") || s.startsWith("'");
+    }
+
+    private boolean endsWithQuote(String s) {
+        return s.endsWith("\"") || s.endsWith("'");
+    }
+
+    private String stripLeadingQuote(String s) {
+        if (s.startsWith("\"") || s.startsWith("'")) return s.substring(1);
+        return s;
+    }
+
+    private String stripTrailingQuote(String s) {
+        if (s.endsWith("\"") || s.endsWith("'")) return s.substring(0, s.length() - 1);
+        return s;
     }
 }
