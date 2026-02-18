@@ -14,3 +14,17 @@ claims:
 economy:
   enabled: true
   vault-required: true
+alignment:
+  warn-interval-minutes: 30
+  out-of-alignment-grace-hours: 48
+
+  messages:
+    honorable:
+      login: "&a[Guild] &fYou are out of alignment for your guild. You have &e%timeleft%&f remaining to fix it."
+      repeat: "&a[Guild] &fOut of alignment. Time left: &e%timeleft%&f."
+    neutral:
+      login: "&7[Guild] &fYou are out of alignment for your guild. You have &e%timeleft%&f remaining to fix it."
+      repeat: "&7[Guild] &fOut of alignment. Time left: &e%timeleft%&f."
+    dark:
+      login: "&c[Guild] &fYou are out of alignment for your guild. You have &e%timeleft%&f remaining to fix it."
+      repeat: "&c[Guild] &fOut of alignment. Time left: &e%timeleft%&f."
