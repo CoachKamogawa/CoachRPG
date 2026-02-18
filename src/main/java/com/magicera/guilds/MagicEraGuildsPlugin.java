@@ -6,6 +6,7 @@ import com.magicera.guilds.commands.AlignmentCommand;
 import com.magicera.guilds.commands.DuelCommand;
 import com.magicera.guilds.commands.GuildCommand;
 import com.magicera.guilds.commands.PartyCommand;
+import com.magicera.guilds.econ.EconomyHook;
 import com.magicera.guilds.gui.MenuListener;
 import com.magicera.guilds.guilds.InviteManager;
 import com.magicera.guilds.guilds.VaultManager;
@@ -21,10 +22,13 @@ public final class MagicEraGuildsPlugin extends JavaPlugin {
     private InviteManager inviteManager;
     private VaultManager vaults;
 
+    private EconomyHook economyHook;
+
     public Storage storage() { return storage; }
     public AlignmentWatcher alignmentWatcher() { return alignmentWatcher; }
     public InviteManager inviteManager() { return inviteManager; }
     public VaultManager vaults() { return vaults; }
+    public EconomyHook economy() { return economyHook; }
 
     @Override
     public void onEnable() {
@@ -36,6 +40,9 @@ public final class MagicEraGuildsPlugin extends JavaPlugin {
 
             inviteManager = new InviteManager(this);
             vaults = new VaultManager(this);
+
+            economyHook = new EconomyHook();
+            boolean econOk = economyHook.setup();
 
             // Commands
             if (getCommand("guild") != null) getCommand("guild").setExecutor(new GuildCommand(this));
@@ -53,7 +60,7 @@ public final class MagicEraGuildsPlugin extends JavaPlugin {
                 try { storage.save(); } catch (Exception ignored) {}
             }, 20L * intervalSeconds, 20L * intervalSeconds);
 
-            // Alignment watcher (stored instance)
+            // Alignment watcher
             alignmentWatcher = new AlignmentWatcher(this);
             Bukkit.getPluginManager().registerEvents(new JoinListener(alignmentWatcher), this);
 
@@ -66,7 +73,12 @@ public final class MagicEraGuildsPlugin extends JavaPlugin {
             getLogger().info("MagicEraGuilds loaded successfully");
             getLogger().info("Author: Coach Kamogawa");
             getLogger().info("Guilds loaded: " + storage.allGuilds().size());
+            getLogger().info("Economy: " + (econOk ? "Vault hooked" : "DISABLED (Vault/Economy missing)"));
             getLogger().info("====================================");
+
+            if (!econOk) {
+                getLogger().warning("Vault economy not found. Guild bank features will not work until Vault + EssentialsX Economy are installed.");
+            }
 
         } catch (Exception e) {
             getLogger().severe("MagicEraGuilds FAILED to load: " +
