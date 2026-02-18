@@ -93,11 +93,15 @@ public final class Storage {
                 try {
                     UUID uuid = UUID.fromString(uuidStr);
                     PlayerData pd = new PlayerData(uuid);
+
                     pd.setGuildId(pSec.getString(uuidStr + ".guildId", null));
                     pd.setAlignmentScore(pSec.getInt(uuidStr + ".alignmentScore", 0));
 
                     long since = pSec.getLong(uuidStr + ".outOfAlignmentSinceEpochMs", 0L);
                     pd.setOutOfAlignmentSinceEpochMs(since == 0L ? null : since);
+
+                    pd.setGuildTitle(pSec.getString(uuidStr + ".guildTitle", ""));
+                    pd.setLastSeenEpochMs(pSec.getLong(uuidStr + ".lastSeenEpochMs", System.currentTimeMillis()));
 
                     playersById.put(uuid, pd);
                 } catch (IllegalArgumentException ignored) {
@@ -135,6 +139,9 @@ public final class Storage {
 
             Long since = p.getOutOfAlignmentSinceEpochMs();
             playersYaml.set(base + ".outOfAlignmentSinceEpochMs", since == null ? 0L : since);
+
+            playersYaml.set(base + ".guildTitle", p.getGuildTitle());
+            playersYaml.set(base + ".lastSeenEpochMs", p.getLastSeenEpochMs());
         }
 
         try {
@@ -152,10 +159,6 @@ public final class Storage {
 
     public PlayerData getOrCreatePlayer(UUID uuid) {
         return playersById.computeIfAbsent(uuid, PlayerData::new);
-    }
-
-    public Collection<PlayerData> allPlayerData() {
-        return Collections.unmodifiableCollection(playersById.values());
     }
 
     public Guild getGuild(String guildId) {
@@ -182,7 +185,7 @@ public final class Storage {
 
     public Guild createGuild(String rawName, String rawPrefix, UUID masterUuid) {
         String id = Text.normalizeId(rawName);
-        String name = Text.color(rawName);
+        String name = Text.color(rawName);   // <- color codes preserved
         String prefix = Text.color(rawPrefix);
 
         Guild g = new Guild(id, name, prefix, GuildAlignment.NEUTRAL);
