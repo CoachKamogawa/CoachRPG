@@ -8,131 +8,132 @@ import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.inventory.InventoryClickEvent;
-import org.bukkit.event.inventory.InventoryCloseEvent;
-
-import java.util.HashMap;
-import java.util.Map;
-import java.util.UUID;
 
 public final class MenuListener implements Listener {
 
     private final MagicEraGuildsPlugin plugin;
-
-    // Track which player has which guild vault open, so we can save on close
-    private final Map<UUID, String> openVaultGuild = new HashMap<>();
 
     public MenuListener(MagicEraGuildsPlugin plugin) {
         this.plugin = plugin;
     }
 
     @EventHandler
-    public void onClick(InventoryClickEvent e) {
-        if (!(e.getWhoClicked() instanceof Player player)) return;
-        String title = e.getView().getTitle();
+    public void onClick(InventoryClickEvent event) {
+        if (!(event.getWhoClicked() instanceof Player player)) return;
 
-        if (!title.equals(Menus.TITLE_MAIN)
-                && !title.equals(Menus.TITLE_YOUR_GUILD)
-                && !title.equals(Menus.TITLE_VAULT)
-                && !title.equals(Menus.TITLE_MEMBERS)
-                && !title.equals(Menus.TITLE_RELATIONS)) {
+        String title = event.getView().getTitle();
+        int raw = event.getRawSlot();
+
+        // only handle clicks in the top inventory
+        if (raw < 0 || raw >= event.getView().getTopInventory().getSize()) return;
+
+        // ----- ALIGNMENT: always accessible (no guild requirement)
+        if (title.equals(Menus.TITLE_ALIGNMENT)) {
+            event.setCancelled(true);
+
+            // back bar
+            if (raw >= 0 && raw < 9) {
+                player.openInventory(Menus.mainMenu(plugin, player.getUniqueId()));
+            }
             return;
         }
 
-        // cancel clicks in our menus (except vault storage area, handled below)
-        e.setCancelled(true);
+        // ----- MAIN MENU
+        if (title.equals(Menus.TITLE_MAIN)) {
+            event.setCancelled(true);
 
+            if (raw == 11) {
+                // Your Guild
+                PlayerData pd = plugin.storage().getOrCreatePlayer(player.getUniqueId());
+                if (pd.getGuildId() == null) {
+                    player.sendMessage("§cYou are not in a guild.");
+                    return;
+                }
+                Guild g = plugin.storage().getGuild(pd.getGuildId());
+                if (g == null) {
+                    pd.setGuildId(null);
+                    plugin.storage().save();
+                    player.sendMessage("§cYour guild data was missing.");
+                    return;
+                }
+                player.openInventory(Menus.yourGuildMenu(g));
+                return;
+            }
+
+            if (raw == 15) {
+                // Alignment
+                player.openInventory(Menus.alignmentMenu(plugin, player.getUniqueId()));
+                return;
+            }
+
+            // Guild list placeholder (slot 13) - do nothing
+            return;
+        }
+
+        // For all guild-only menus, we need guild data
         PlayerData pd = plugin.storage().getOrCreatePlayer(player.getUniqueId());
         Guild g = pd.getGuildId() == null ? null : plugin.storage().getGuild(pd.getGuildId());
 
-        if (title.equals(Menus.TITLE_MAIN)) {
-            Material m = e.getCurrentItem() == null ? null : e.getCurrentItem().getType();
-            if (m == null) return;
-
-            if (m == Material.BOOK && g != null) {
-                player.openInventory(Menus.yourGuildMenu(g));
-            }
-            // Guild list + alignment are display-only for now
-            return;
-        }
-
+        // ----- YOUR GUILD MENU
         if (title.equals(Menus.TITLE_YOUR_GUILD)) {
-            Material m = e.getCurrentItem() == null ? null : e.getCurrentItem().getType();
-            if (m == null) return;
+            event.setCancelled(true);
 
-            if (m == Material.RED_STAINED_GLASS_PANE) {
+            if (raw >= 0 && raw < 9) {
                 player.openInventory(Menus.mainMenu(plugin, player.getUniqueId()));
                 return;
             }
 
             if (g == null) {
-                player.closeInventory();
+                player.sendMessage("§cYou are not in a guild.");
+                player.openInventory(Menus.mainMenu(plugin, player.getUniqueId()));
                 return;
             }
 
-            if (m == Material.CHEST) {
-                // Bank balance placeholder = 0 for now; Vault hook later
-                var inv = Menus.vaultMenu(g, g.getBankBalance());
-                // load vault items into slots 9..53
-                var items = plugin.vaults().loadVault(g.getId());
-                for (int i = 0; i < 45; i++) {
-                    inv.setItem(9 + i, items[i]);
-                }
-                openVaultGuild.put(player.getUniqueId(), g.getId());
-                player.openInventory(inv);
+            if (raw == 12) {
+                player.openInventory(Menus.vaultMenu(g, g.getBankBalance()));
                 return;
             }
-
-            if (m == Material.PLAYER_HEAD) {
+            if (raw == 13) {
                 player.openInventory(Menus.membersMenu(plugin, g));
                 return;
             }
-
-            if (m == Material.IRON_SWORD) {
+            if (raw == 14) {
                 player.openInventory(Menus.relationsMenu(g));
                 return;
             }
             return;
         }
 
-        if (title.equals(Menus.TITLE_MEMBERS) || title.equals(Menus.TITLE_RELATIONS)) {
-            Material m = e.getCurrentItem() == null ? null : e.getCurrentItem().getType();
-            if (m == Material.RED_STAINED_GLASS_PANE) {
+        // ----- VAULT
+        if (title.equals(Menus.TITLE_VAULT)) {
+            event.setCancelled(true);
+
+            if (raw >= 0 && raw < 9) {
                 if (g != null) player.openInventory(Menus.yourGuildMenu(g));
                 else player.openInventory(Menus.mainMenu(plugin, player.getUniqueId()));
             }
             return;
         }
 
-        if (title.equals(Menus.TITLE_VAULT)) {
-            // Allow interaction ONLY in storage area (slots 9..53)
-            int raw = e.getRawSlot();
-            if (raw >= 9 && raw < 54) {
-                e.setCancelled(false); // allow move/items
-                return;
-            }
+        // ----- MEMBERS
+        if (title.equals(Menus.TITLE_MEMBERS)) {
+            event.setCancelled(true);
 
-            // Click top bar: go back
-            Material m = e.getCurrentItem() == null ? null : e.getCurrentItem().getType();
-            if (m == Material.RED_STAINED_GLASS_PANE) {
+            if (raw >= 0 && raw < 9) {
+                if (g != null) player.openInventory(Menus.yourGuildMenu(g));
+                else player.openInventory(Menus.mainMenu(plugin, player.getUniqueId()));
+            }
+            return;
+        }
+
+        // ----- RELATIONS
+        if (title.equals(Menus.TITLE_RELATIONS)) {
+            event.setCancelled(true);
+
+            if (raw >= 0 && raw < 9) {
                 if (g != null) player.openInventory(Menus.yourGuildMenu(g));
                 else player.openInventory(Menus.mainMenu(plugin, player.getUniqueId()));
             }
         }
-    }
-
-    @EventHandler
-    public void onClose(InventoryCloseEvent e) {
-        if (!(e.getPlayer() instanceof Player player)) return;
-        if (!e.getView().getTitle().equals(Menus.TITLE_VAULT)) return;
-
-        String guildId = openVaultGuild.remove(player.getUniqueId());
-        if (guildId == null) return;
-
-        // Save slots 9..53 (45 items)
-        var contents45 = new org.bukkit.inventory.ItemStack[45];
-        for (int i = 0; i < 45; i++) {
-            contents45[i] = e.getInventory().getItem(9 + i);
-        }
-        plugin.vaults().saveVault(guildId, contents45);
     }
 }
