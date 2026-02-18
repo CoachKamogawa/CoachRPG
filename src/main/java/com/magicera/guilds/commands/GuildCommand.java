@@ -2,7 +2,9 @@ package com.magicera.guilds.commands;
 
 import com.magicera.guilds.MagicEraGuildsPlugin;
 import com.magicera.guilds.data.Guild;
+import com.magicera.guilds.data.GuildAlignment;
 import com.magicera.guilds.data.PlayerData;
+import com.magicera.guilds.util.AlignmentUtil;
 import com.magicera.guilds.util.Text;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
@@ -81,11 +83,15 @@ public final class GuildCommand implements CommandExecutor {
                 return true;
             }
 
+            // Guild alignment auto-selected from the guild master's alignment score
+            GuildAlignment masterAlign = AlignmentUtil.groupFromScore(pd.getAlignmentScore());
+
             Guild g = plugin.storage().createGuild(rawName, rawPrefix, player.getUniqueId());
+            g.setAlignment(masterAlign);
+
             plugin.storage().save();
 
-            sender.sendMessage("§aCreated guild: §r" + g.getName() + " §7[" + g.getPrefix() + "§7]");
-            sender.sendMessage("§7Alignment will be selected next step.");
+            sender.sendMessage("§aCreated guild: §r" + g.getName() + " §7[" + g.getPrefix() + "§7] §7Alignment: §f" + masterAlign.name());
             return true;
         }
 
