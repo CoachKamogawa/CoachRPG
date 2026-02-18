@@ -7,12 +7,18 @@ public final class PlayerData {
 
     private String guildId;                 // nullable
     private int alignmentScore;             // -100..100
-    private Long outOfAlignmentSinceEpochMs; // nullable, real-time epoch ms
+    private Long outOfAlignmentSinceEpochMs; // nullable (epoch ms)
+
+    // NEW:
+    private String guildTitle;              // nullable / empty ok
+    private long lastSeenEpochMs;           // epoch ms (updated on quit, and on join init)
 
     public PlayerData(UUID uuid) {
         this.uuid = uuid;
         this.alignmentScore = 0;
         this.outOfAlignmentSinceEpochMs = null;
+        this.guildTitle = "";
+        this.lastSeenEpochMs = System.currentTimeMillis();
     }
 
     public UUID getUuid() { return uuid; }
@@ -25,4 +31,10 @@ public final class PlayerData {
 
     public Long getOutOfAlignmentSinceEpochMs() { return outOfAlignmentSinceEpochMs; }
     public void setOutOfAlignmentSinceEpochMs(Long v) { this.outOfAlignmentSinceEpochMs = v; }
+
+    public String getGuildTitle() { return guildTitle == null ? "" : guildTitle; }
+    public void setGuildTitle(String guildTitle) { this.guildTitle = guildTitle; }
+
+    public long getLastSeenEpochMs() { return lastSeenEpochMs; }
+    public void setLastSeenEpochMs(long lastSeenEpochMs) { this.lastSeenEpochMs = lastSeenEpochMs; }
 }
