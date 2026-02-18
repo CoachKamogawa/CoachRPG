@@ -28,14 +28,20 @@ public final class GuildCommand implements CommandExecutor {
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
 
+        // /guild -> open GUI menu (players), show help (console)
         if (args.length == 0) {
-            sender.sendMessage("§7/guild create \"<name>\" <displayName>");
-            sender.sendMessage("§7Example: §f/guild create \"White Rose\" &aWR");
-            sender.sendMessage("§7/guild invite <player>");
-            sender.sendMessage("§7/guild accept");
-            sender.sendMessage("§7/guild deny");
-            sender.sendMessage("§7/guild disband");
-            sender.sendMessage("§7/guild reload");
+            if (!(sender instanceof Player player)) {
+                sender.sendMessage("§7/guild create \"<name>\" <displayName>");
+                sender.sendMessage("§7Example: §f/guild create \"White Rose\" &aWR");
+                sender.sendMessage("§7/guild invite <player>");
+                sender.sendMessage("§7/guild accept");
+                sender.sendMessage("§7/guild deny");
+                sender.sendMessage("§7/guild disband");
+                sender.sendMessage("§7/guild reload");
+                return true;
+            }
+
+            player.openInventory(com.magicera.guilds.gui.Menus.mainMenu(plugin, player.getUniqueId()));
             return true;
         }
 
