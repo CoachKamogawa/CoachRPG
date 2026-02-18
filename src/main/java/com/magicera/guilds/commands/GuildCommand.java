@@ -3,13 +3,17 @@ package com.magicera.guilds.commands;
 import com.magicera.guilds.MagicEraGuildsPlugin;
 import com.magicera.guilds.data.Guild;
 import com.magicera.guilds.data.GuildAlignment;
+import com.magicera.guilds.data.GuildRole;
 import com.magicera.guilds.data.PlayerData;
 import com.magicera.guilds.util.AlignmentUtil;
 import com.magicera.guilds.util.Text;
+import org.bukkit.Bukkit;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
+
+import java.util.UUID;
 
 public final class GuildCommand implements CommandExecutor {
 
@@ -24,6 +28,7 @@ public final class GuildCommand implements CommandExecutor {
 
         if (args.length == 0) {
             sender.sendMessage("§7/guild create <name> <displayName>");
+            sender.sendMessage("§7/guild disband");
             sender.sendMessage("§7/guild reload");
             return true;
         }
@@ -83,7 +88,6 @@ public final class GuildCommand implements CommandExecutor {
                 return true;
             }
 
-            // Guild alignment auto-selected from the guild master's alignment score
             GuildAlignment masterAlign = AlignmentUtil.groupFromScore(pd.getAlignmentScore());
 
             Guild g = plugin.storage().createGuild(rawName, rawPrefix, player.getUniqueId());
@@ -92,6 +96,49 @@ public final class GuildCommand implements CommandExecutor {
             plugin.storage().save();
 
             sender.sendMessage("§aCreated guild: §r" + g.getName() + " §7[" + g.getPrefix() + "§7] §7Alignment: §f" + masterAlign.name());
+            return true;
+        }
+
+        if (sub.equals("disband")) {
+            if (!(sender instanceof Player player)) {
+                sender.sendMessage("§cPlayers only.");
+                return true;
+            }
+
+            PlayerData pd = plugin.storage().getOrCreatePlayer(player.getUniqueId());
+            if (pd.getGuildId() == null) {
+                sender.sendMessage("§cYou are not in a guild.");
+                return true;
+            }
+
+            Guild g = plugin.storage().getGuild(pd.getGuildId());
+            if (g == null) {
+                pd.setGuildId(null);
+                plugin.storage().save();
+                sender.sendMessage("§cGuild data was missing. You have been removed from the guild.");
+                return true;
+            }
+
+            GuildRole role = g.getMembers().get(player.getUniqueId());
+            if (role != GuildRole.MASTER) {
+                sender.sendMessage("§cOnly the Guild Master can disband the guild.");
+                return true;
+            }
+
+            // Clear guildId for every member
+            for (UUID memberId : g.getMembers().keySet()) {
+                PlayerData mpd = plugin.storage().getOrCreatePlayer(memberId);
+                if (pd.getGuildId() != null && pd.getGuildId().equals(g.getId())) {
+                    mpd.setGuildId(null);
+                    mpd.setOutOfAlignmentSinceEpochMs(null);
+                }
+            }
+
+            // Delete guild
+            plugin.storage().deleteGuild(g.getId());
+            plugin.storage().save();
+
+            Bukkit.broadcastMessage("§7[§bMagicEra§7] §cGuild disbanded: §r" + g.getName());
             return true;
         }
 
