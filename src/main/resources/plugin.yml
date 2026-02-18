@@ -1,0 +1,30 @@
+name: MagicEraGuilds
+version: 0.1.0
+main: com.magicera.guilds.MagicEraGuildsPlugin
+api-version: "1.21"
+author: Coach Kamogawa
+description: Guilds, claims, parties, duels for Magic Era.
+
+commands:
+  guild:
+    description: Guild command
+    usage: /guild
+    permission: magicera.guilds.use
+  party:
+    description: Party command
+    usage: /party
+    permission: magicera.party.use
+  duel:
+    description: Duel command
+    usage: /duel
+    permission: magicera.duel.use
+
+permissions:
+  magicera.guilds.use:
+    default: true
+  magicera.party.use:
+    default: true
+  magicera.duel.use:
+    default: true
+  magicera.admin:
+    default: op
