@@ -8,18 +8,13 @@ version = "0.1.0"
 repositories {
     mavenCentral()
     maven { url = "https://repo.papermc.io/repository/maven-public/" }
-    maven { url = "https://hub.spigotmc.org/nexus/content/repositories/snapshots/" }
 }
-
 
 dependencies {
     compileOnly("io.papermc.paper:paper-api:1.21.4-R0.1-SNAPSHOT")
 
-    // Vault API (compile-time only)
-    compileOnly("net.milkbowl.vault:VaultAPI:1.7") {
-        exclude group: "org.bukkit", module: "bukkit"
-        exclude group: "org.spigotmc", module: "spigot-api"
-    }
+    // Local Vault jar for compile
+    compileOnly(files("libs/Vault.jar"))
 }
 
 java {
