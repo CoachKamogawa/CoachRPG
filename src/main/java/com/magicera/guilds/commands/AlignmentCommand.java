@@ -71,6 +71,11 @@ public final class AlignmentCommand implements CommandExecutor {
 
             GuildAlignment group = AlignmentUtil.groupFromScore(newScore);
             sender.sendMessage("§aSet " + target.getName() + " alignment to §f" + newScore + " §7(" + group.name() + ")");
+
+            // Live check immediately
+            if (plugin.alignmentWatcher() != null) {
+                plugin.alignmentWatcher().checkAndWarn(target, false);
+            }
             return true;
         }
 
@@ -81,6 +86,11 @@ public final class AlignmentCommand implements CommandExecutor {
 
             GuildAlignment group = AlignmentUtil.groupFromScore(newScore);
             sender.sendMessage("§aAdded " + amount + " to " + target.getName() + ". Now: §f" + newScore + " §7(" + group.name() + ")");
+
+            // Live check immediately
+            if (plugin.alignmentWatcher() != null) {
+                plugin.alignmentWatcher().checkAndWarn(target, false);
+            }
             return true;
         }
 
