@@ -5,6 +5,7 @@ import com.magicera.guilds.data.Guild;
 import com.magicera.guilds.data.GuildAlignment;
 import com.magicera.guilds.data.GuildRole;
 import com.magicera.guilds.data.PlayerData;
+import com.magicera.guilds.guilds.InviteManager;
 import com.magicera.guilds.util.AlignmentUtil;
 import com.magicera.guilds.util.Text;
 import org.bukkit.Bukkit;
@@ -28,6 +29,9 @@ public final class GuildCommand implements CommandExecutor {
 
         if (args.length == 0) {
             sender.sendMessage("§7/guild create <name> <displayName>");
+            sender.sendMessage("§7/guild invite <player>");
+            sender.sendMessage("§7/guild accept");
+            sender.sendMessage("§7/guild deny");
             sender.sendMessage("§7/guild disband");
             sender.sendMessage("§7/guild reload");
             return true;
@@ -99,6 +103,143 @@ public final class GuildCommand implements CommandExecutor {
             return true;
         }
 
+        if (sub.equals("invite")) {
+            if (!(sender instanceof Player inviter)) {
+                sender.sendMessage("§cPlayers only.");
+                return true;
+            }
+            if (args.length < 2) {
+                sender.sendMessage("§cUsage: /guild invite <player>");
+                return true;
+            }
+
+            PlayerData inviterData = plugin.storage().getOrCreatePlayer(inviter.getUniqueId());
+            if (inviterData.getGuildId() == null) {
+                sender.sendMessage("§cYou are not in a guild.");
+                return true;
+            }
+
+            Guild guild = plugin.storage().getGuild(inviterData.getGuildId());
+            if (guild == null) {
+                inviterData.setGuildId(null);
+                plugin.storage().save();
+                sender.sendMessage("§cYour guild data was missing.");
+                return true;
+            }
+
+            GuildRole role = guild.getMembers().get(inviter.getUniqueId());
+            if (role != GuildRole.MASTER && role != GuildRole.OFFICER) {
+                sender.sendMessage("§cOnly Guild Master or Officer can invite.");
+                return true;
+            }
+
+            Player target = Bukkit.getPlayerExact(args[1]);
+            if (target == null) {
+                sender.sendMessage("§cPlayer must be online.");
+                return true;
+            }
+
+            if (target.getUniqueId().equals(inviter.getUniqueId())) {
+                sender.sendMessage("§cYou cannot invite yourself.");
+                return true;
+            }
+
+            PlayerData targetData = plugin.storage().getOrCreatePlayer(target.getUniqueId());
+            if (targetData.getGuildId() != null) {
+                sender.sendMessage("§cThat player is already in a guild.");
+                return true;
+            }
+
+            // Alignment enforcement at invite time:
+            GuildAlignment guildAlign = guild.getAlignment();
+            GuildAlignment targetAlign = AlignmentUtil.groupFromScore(targetData.getAlignmentScore());
+
+            // If target is neutral, allow invite (they'll snap on accept)
+            // If not neutral, must match guild alignment
+            if (targetAlign != GuildAlignment.NEUTRAL && targetAlign != guildAlign) {
+                sender.sendMessage("§cThat player is out of alignment and cannot join this guild.");
+                return true;
+            }
+
+            plugin.inviteManager().setInvite(target.getUniqueId(), guild.getId(), inviter.getUniqueId());
+
+            sender.sendMessage("§aInvited §f" + target.getName() + " §ato §r" + guild.getName() + " §7[" + guild.getPrefix() + "§7]");
+            target.sendMessage("§7[§bMagicEra§7] §fYou were invited to join §r" + guild.getName() + " §7[" + guild.getPrefix() + "§7]");
+            target.sendMessage("§7Type §a/guild accept §7or §c/guild deny");
+
+            return true;
+        }
+
+        if (sub.equals("accept") || sub.equals("deny")) {
+            if (!(sender instanceof Player player)) {
+                sender.sendMessage("§cPlayers only.");
+                return true;
+            }
+
+            PlayerData pd = plugin.storage().getOrCreatePlayer(player.getUniqueId());
+            if (pd.getGuildId() != null) {
+                sender.sendMessage("§cYou are already in a guild.");
+                plugin.inviteManager().clearInvite(player);
+                return true;
+            }
+
+            InviteManager.Invite inv = plugin.inviteManager().getInvite(player.getUniqueId());
+            if (inv == null) {
+                sender.sendMessage("§cYou have no pending guild invites (or it expired).");
+                return true;
+            }
+
+            Guild guild = plugin.storage().getGuild(inv.guildId);
+            if (guild == null) {
+                plugin.inviteManager().clearInvite(player);
+                sender.sendMessage("§cThat guild no longer exists.");
+                return true;
+            }
+
+            if (sub.equals("deny")) {
+                plugin.inviteManager().clearInvite(player);
+                sender.sendMessage("§7Invite declined.");
+                Player inviter = Bukkit.getPlayer(inv.inviter);
+                if (inviter != null) inviter.sendMessage("§c" + player.getName() + " declined the guild invite.");
+                return true;
+            }
+
+            // ACCEPT: enforce alignment again + apply neutral auto-snap
+            GuildAlignment guildAlign = guild.getAlignment();
+            GuildAlignment playerAlign = AlignmentUtil.groupFromScore(pd.getAlignmentScore());
+
+            if (playerAlign == GuildAlignment.NEUTRAL && guildAlign != GuildAlignment.NEUTRAL) {
+                // Neutral joining non-neutral guild => snap alignment score
+                int snapped = AlignmentUtil.snapScoreToGuild(guildAlign);
+                pd.setAlignmentScore(snapped);
+                playerAlign = AlignmentUtil.groupFromScore(pd.getAlignmentScore());
+            }
+
+            if (playerAlign != guildAlign) {
+                plugin.inviteManager().clearInvite(player);
+                sender.sendMessage("§cYou are out of alignment and cannot join this guild.");
+                return true;
+            }
+
+            // Join guild
+            pd.setGuildId(guild.getId());
+            pd.setOutOfAlignmentSinceEpochMs(null);
+            guild.setRole(player.getUniqueId(), GuildRole.MEMBER);
+
+            plugin.inviteManager().clearInvite(player);
+            plugin.storage().save();
+
+            sender.sendMessage("§aYou joined §r" + guild.getName() + " §7[" + guild.getPrefix() + "§7]");
+            Bukkit.broadcastMessage("§7[§bMagicEra§7] §f" + player.getName() + " §7joined §r" + guild.getName());
+
+            // Immediately re-check alignment status (should be fine)
+            if (plugin.alignmentWatcher() != null) {
+                plugin.alignmentWatcher().checkAndWarn(player, false);
+            }
+
+            return true;
+        }
+
         if (sub.equals("disband")) {
             if (!(sender instanceof Player player)) {
                 sender.sendMessage("§cPlayers only.");
@@ -125,10 +266,10 @@ public final class GuildCommand implements CommandExecutor {
                 return true;
             }
 
-            // Clear guildId for every member
+            // Clear guildId for every member (FIXED LOOP)
             for (UUID memberId : g.getMembers().keySet()) {
                 PlayerData mpd = plugin.storage().getOrCreatePlayer(memberId);
-                if (pd.getGuildId() != null && pd.getGuildId().equals(g.getId())) {
+                if (g.getId().equals(mpd.getGuildId())) {
                     mpd.setGuildId(null);
                     mpd.setOutOfAlignmentSinceEpochMs(null);
                 }
