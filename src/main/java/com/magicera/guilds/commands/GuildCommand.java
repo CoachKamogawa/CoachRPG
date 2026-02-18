@@ -8,14 +8,16 @@ import com.magicera.guilds.data.PlayerData;
 import com.magicera.guilds.guilds.InviteManager;
 import com.magicera.guilds.util.AlignmentUtil;
 import com.magicera.guilds.util.Text;
+import net.milkbowl.vault.economy.Economy;
 import org.bukkit.Bukkit;
+import org.bukkit.Material;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 
-import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 
 public final class GuildCommand implements CommandExecutor {
 
@@ -28,19 +30,16 @@ public final class GuildCommand implements CommandExecutor {
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
 
-        // /guild -> open GUI menu (players), show help (console)
         if (args.length == 0) {
             if (!(sender instanceof Player player)) {
                 sender.sendMessage("§7/guild create \"<name>\" <displayName>");
-                sender.sendMessage("§7Example: §f/guild create \"White Rose\" &aWR");
                 sender.sendMessage("§7/guild invite <player>");
-                sender.sendMessage("§7/guild accept");
-                sender.sendMessage("§7/guild deny");
+                sender.sendMessage("§7/guild accept | deny");
                 sender.sendMessage("§7/guild disband");
-                sender.sendMessage("§7/guild reload");
+                sender.sendMessage("§7/guild bank deposit|withdraw <amount>");
+                sender.sendMessage("§7/guild tax <0-9>");
                 return true;
             }
-
             player.openInventory(com.magicera.guilds.gui.Menus.mainMenu(plugin, player.getUniqueId()));
             return true;
         }
@@ -57,6 +56,180 @@ public final class GuildCommand implements CommandExecutor {
             sender.sendMessage("§aReloaded guild data.");
             return true;
         }
+
+        // ---------------- BANK ----------------
+        if (sub.equals("bank")) {
+            if (!(sender instanceof Player player)) {
+                sender.sendMessage("§cPlayers only.");
+                return true;
+            }
+            if (args.length < 3) {
+                sender.sendMessage("§cUsage: /guild bank deposit <amount>");
+                sender.sendMessage("§cUsage: /guild bank withdraw <amount>");
+                return true;
+            }
+
+            PlayerData pd = plugin.storage().getOrCreatePlayer(player.getUniqueId());
+            if (pd.getGuildId() == null) {
+                sender.sendMessage("§cYou are not in a guild.");
+                return true;
+            }
+
+            Guild g = plugin.storage().getGuild(pd.getGuildId());
+            if (g == null) {
+                pd.setGuildId(null);
+                plugin.storage().save();
+                sender.sendMessage("§cGuild data missing.");
+                return true;
+            }
+
+            Economy econ = plugin.economy() == null ? null : plugin.economy().econ();
+            if (econ == null) {
+                sender.sendMessage("§cEconomy is not available. Install Vault + EssentialsX Economy.");
+                return true;
+            }
+
+            String action = args[1].toLowerCase();
+            double amount;
+            try {
+                amount = Double.parseDouble(args[2]);
+            } catch (NumberFormatException e) {
+                sender.sendMessage("§cAmount must be a number.");
+                return true;
+            }
+            if (amount <= 0) {
+                sender.sendMessage("§cAmount must be > 0.");
+                return true;
+            }
+
+            if (action.equals("deposit")) {
+                if (!econ.has(player, amount)) {
+                    sender.sendMessage("§cYou don't have enough money.");
+                    return true;
+                }
+                var resp = econ.withdrawPlayer(player, amount);
+                if (!resp.transactionSuccess()) {
+                    sender.sendMessage("§cFailed to withdraw from your balance: " + resp.errorMessage);
+                    return true;
+                }
+
+                g.setBankBalance(g.getBankBalance() + amount);
+                plugin.storage().save();
+
+                sender.sendMessage("§aDeposited §f$" + fmt(amount) + " §ainto guild bank. New balance: §f$" + fmt(g.getBankBalance()));
+                return true;
+            }
+
+            if (action.equals("withdraw")) {
+                GuildRole role = g.getMembers().get(player.getUniqueId());
+                if (role != GuildRole.MASTER && role != GuildRole.OFFICER) {
+                    sender.sendMessage("§cOnly Guild Master or Officer can withdraw.");
+                    return true;
+                }
+
+                if (amount > g.getBankBalance()) {
+                    sender.sendMessage("§cGuild bank doesn't have enough funds.");
+                    return true;
+                }
+
+                if (role == GuildRole.OFFICER) {
+                    // Officer limited to 25% of current guild balance per rolling 24 hours.
+                    long now = System.currentTimeMillis();
+                    long windowStart = g.getOfficerWithdrawWindowStartMs();
+                    if (windowStart <= 0L || (now - windowStart) >= TimeUnit.HOURS.toMillis(24)) {
+                        // reset window
+                        g.setOfficerWithdrawWindowStartMs(now);
+                        g.setOfficerWithdrawUsed24h(0.0);
+                    }
+
+                    double limit = g.getBankBalance() * 0.25;
+                    double used = g.getOfficerWithdrawUsed24h();
+                    double remaining = Math.max(0.0, limit - used);
+
+                    if (amount > remaining + 0.0001) {
+                        sender.sendMessage("§cOfficer withdraw limit reached.");
+                        sender.sendMessage("§7Limit (24h): §f$" + fmt(limit) + " §7Used: §f$" + fmt(used) + " §7Remaining: §f$" + fmt(remaining));
+                        return true;
+                    }
+
+                    // record usage
+                    g.setOfficerWithdrawUsed24h(used + amount);
+                }
+
+                // apply withdraw
+                g.setBankBalance(g.getBankBalance() - amount);
+                plugin.storage().save();
+
+                var resp = econ.depositPlayer(player, amount);
+                if (!resp.transactionSuccess()) {
+                    // refund bank on failure
+                    g.setBankBalance(g.getBankBalance() + amount);
+                    plugin.storage().save();
+                    sender.sendMessage("§cFailed to deposit to your balance: " + resp.errorMessage);
+                    return true;
+                }
+
+                sender.sendMessage("§aWithdrew §f$" + fmt(amount) + " §afrom guild bank. New balance: §f$" + fmt(g.getBankBalance()));
+                return true;
+            }
+
+            sender.sendMessage("§cUsage: /guild bank deposit <amount>");
+            sender.sendMessage("§cUsage: /guild bank withdraw <amount>");
+            return true;
+        }
+
+        // ---------------- TAX ----------------
+        if (sub.equals("tax")) {
+            if (!(sender instanceof Player player)) {
+                sender.sendMessage("§cPlayers only.");
+                return true;
+            }
+            if (args.length < 2) {
+                sender.sendMessage("§cUsage: /guild tax <0-9>");
+                return true;
+            }
+
+            PlayerData pd = plugin.storage().getOrCreatePlayer(player.getUniqueId());
+            if (pd.getGuildId() == null) {
+                sender.sendMessage("§cYou are not in a guild.");
+                return true;
+            }
+
+            Guild g = plugin.storage().getGuild(pd.getGuildId());
+            if (g == null) {
+                pd.setGuildId(null);
+                plugin.storage().save();
+                sender.sendMessage("§cGuild data missing.");
+                return true;
+            }
+
+            GuildRole role = g.getMembers().get(player.getUniqueId());
+            if (role != GuildRole.MASTER) {
+                sender.sendMessage("§cOnly the Guild Master can set tax.");
+                return true;
+            }
+
+            int pct;
+            try {
+                pct = Integer.parseInt(args[1]);
+            } catch (NumberFormatException e) {
+                sender.sendMessage("§cTax must be a number 0-9.");
+                return true;
+            }
+            if (pct < 0 || pct > 9) {
+                sender.sendMessage("§cTax must be between 0 and 9.");
+                return true;
+            }
+
+            g.setTaxPercent(pct);
+            plugin.storage().save();
+
+            sender.sendMessage("§aGuild tax set to §f" + pct + "%");
+            return true;
+        }
+
+        // ---------------- EXISTING COMMANDS (create/invite/accept/deny/disband) ----------------
+        // (Keep your existing code below this point exactly as you had it previously)
 
         if (sub.equals("create")) {
             if (!(sender instanceof Player player)) {
@@ -77,8 +250,8 @@ public final class GuildCommand implements CommandExecutor {
                 return true;
             }
 
-            String rawName = parsed.guildName;     // can include spaces + colors
-            String rawPrefix = parsed.displayName; // 2-4 chars, colors allowed
+            String rawName = parsed.guildName;
+            String rawPrefix = parsed.displayName;
 
             String id = Text.normalizeId(rawName);
             if (id.isEmpty()) {
@@ -226,7 +399,6 @@ public final class GuildCommand implements CommandExecutor {
                 return true;
             }
 
-            // Join guild
             pd.setGuildId(guild.getId());
             pd.setOutOfAlignmentSinceEpochMs(null);
             guild.setRole(player.getUniqueId(), GuildRole.MEMBER);
@@ -236,8 +408,6 @@ public final class GuildCommand implements CommandExecutor {
 
             sender.sendMessage("§aYou joined §r" + guild.getName() + " §7[" + guild.getPrefix() + "§7]");
 
-            // Server announcement format requested:
-            // </aqua>[Magic Era] </white><player> has joined <guild name with color codes></white>.
             Bukkit.broadcastMessage("§b[Magic Era] §f" + player.getName() + " has joined " + Text.color(guild.getName()) + "§f.");
 
             if (plugin.alignmentWatcher() != null) {
@@ -292,7 +462,10 @@ public final class GuildCommand implements CommandExecutor {
         return true;
     }
 
-    // ----- helpers -----
+    private static String fmt(double v) {
+        if (Math.abs(v - Math.round(v)) < 0.0001) return String.valueOf((long) Math.round(v));
+        return String.format("%.2f", v);
+    }
 
     private static final class ParsedCreate {
         final String guildName;
@@ -303,18 +476,11 @@ public final class GuildCommand implements CommandExecutor {
         }
     }
 
-    /**
-     * Accepts:
-     *  /guild create "Name With Spaces" &aWR
-     *  /guild create 'Name With Spaces' &aWR
-     */
     private ParsedCreate parseCreateArgs(String[] args) {
         if (args.length < 3) return null;
 
-        // If name is quoted, join tokens until closing quote.
         String second = args[1];
         if (startsWithQuote(second)) {
-            String quote = second.substring(0, 1); // " or '
             StringBuilder name = new StringBuilder(stripLeadingQuote(second));
 
             int i = 2;
@@ -343,7 +509,6 @@ public final class GuildCommand implements CommandExecutor {
             return new ParsedCreate(rawName, rawPrefix);
         }
 
-        // No quotes: old behavior (no spaces)
         if (args.length < 3) return null;
         return new ParsedCreate(args[1], args[2]);
     }
