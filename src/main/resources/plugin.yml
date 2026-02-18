@@ -10,14 +10,21 @@ commands:
     description: Guild command
     usage: /guild
     permission: magicera.guilds.use
+
   party:
     description: Party command
     usage: /party
     permission: magicera.party.use
+
   duel:
     description: Duel command
     usage: /duel
     permission: magicera.duel.use
+
+  alignment:
+    description: Alignment admin command
+    usage: /alignment <get|set|add> <player> [amount]
+    permission: magicera.admin
 
 permissions:
   magicera.guilds.use:
