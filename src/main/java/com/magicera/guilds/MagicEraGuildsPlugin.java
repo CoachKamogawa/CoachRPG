@@ -1,5 +1,7 @@
 package com.magicera.guilds;
 
+import com.magicera.guilds.alignment.AlignmentWatcher;
+import com.magicera.guilds.alignment.JoinListener;
 import com.magicera.guilds.commands.DuelCommand;
 import com.magicera.guilds.commands.GuildCommand;
 import com.magicera.guilds.commands.PartyCommand;
@@ -32,8 +34,15 @@ public final class MagicEraGuildsPlugin extends JavaPlugin {
                 try { storage.save(); } catch (Exception ignored) {}
             }, 20L * intervalSeconds, 20L * intervalSeconds);
 
+            // Alignment watcher: warn on login and every X minutes (real-time grace stored in epoch ms)
+            AlignmentWatcher watcher = new AlignmentWatcher(this);
+            Bukkit.getPluginManager().registerEvents(new JoinListener(watcher), this);
+
+            int warnMinutes = Math.max(1, getConfig().getInt("alignment.warn-interval-minutes", 30));
+            Bukkit.getScheduler().runTaskTimer(this, watcher, 20L * 60L * warnMinutes, 20L * 60L * warnMinutes);
+
             getLogger().info("====================================");
-            getLogger().info("CoachRPG loaded successfully");
+            getLogger().info("MagicEraGuilds loaded successfully");
             getLogger().info("Author: Coach Kamogawa");
             getLogger().info("Guilds loaded: " + storage.allGuilds().size());
             getLogger().info("====================================");
