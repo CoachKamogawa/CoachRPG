@@ -2,6 +2,7 @@ package com.magicera.guilds;
 
 import com.magicera.guilds.alignment.AlignmentWatcher;
 import com.magicera.guilds.alignment.JoinListener;
+import com.magicera.guilds.commands.AlignmentCommand;
 import com.magicera.guilds.commands.DuelCommand;
 import com.magicera.guilds.commands.GuildCommand;
 import com.magicera.guilds.commands.PartyCommand;
@@ -25,16 +26,19 @@ public final class MagicEraGuildsPlugin extends JavaPlugin {
             storage = new Storage(this);
             storage.load();
 
+            // Commands
             if (getCommand("guild") != null) getCommand("guild").setExecutor(new GuildCommand(this));
             if (getCommand("party") != null) getCommand("party").setExecutor(new PartyCommand(this));
             if (getCommand("duel") != null) getCommand("duel").setExecutor(new DuelCommand(this));
+            if (getCommand("alignment") != null) getCommand("alignment").setExecutor(new AlignmentCommand(this));
 
+            // Auto-save
             int intervalSeconds = Math.max(30, getConfig().getInt("data.save-interval-seconds", 120));
             Bukkit.getScheduler().runTaskTimerAsynchronously(this, () -> {
                 try { storage.save(); } catch (Exception ignored) {}
             }, 20L * intervalSeconds, 20L * intervalSeconds);
 
-            // Alignment watcher: warn on login and every X minutes (real-time grace stored in epoch ms)
+            // Alignment watcher
             AlignmentWatcher watcher = new AlignmentWatcher(this);
             Bukkit.getPluginManager().registerEvents(new JoinListener(watcher), this);
 
@@ -48,7 +52,8 @@ public final class MagicEraGuildsPlugin extends JavaPlugin {
             getLogger().info("====================================");
 
         } catch (Exception e) {
-            getLogger().severe("MagicEraGuilds FAILED to load: " + (e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage()));
+            getLogger().severe("MagicEraGuilds FAILED to load: " +
+                    (e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage()));
             Bukkit.getPluginManager().disablePlugin(this);
         }
     }
