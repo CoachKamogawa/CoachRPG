@@ -26,6 +26,7 @@ public final class Menus {
     public static final String TITLE_VAULT = "§8Guild Vault";
     public static final String TITLE_MEMBERS = "§8Guild Members";
     public static final String TITLE_RELATIONS = "§8Relations";
+    public static final String TITLE_ALIGNMENT = "§8Alignment";
 
     public static Inventory mainMenu(MagicEraGuildsPlugin plugin, UUID viewer) {
         PlayerData pd = plugin.storage().getOrCreatePlayer(viewer);
@@ -44,7 +45,9 @@ public final class Menus {
             )));
             inv.setItem(15, item(Material.NETHER_STAR, "§bAlignment", lore(
                     "§7Guild Alignment:",
-                    "§f" + g.getAlignment().name()
+                    "§f" + g.getAlignment().name(),
+                    "",
+                    "§eClick to view"
             )));
         } else {
             inv.setItem(11, item(Material.BARRIER, "§bYour Guild", lore(
@@ -63,11 +66,47 @@ public final class Menus {
         return inv;
     }
 
+    /**
+     * Used by /align and by the Guild Menu "Alignment" button.
+     * This is currently informational only (click logic handled in MenuListener if you add it).
+     */
+    public static Inventory alignmentMenu(MagicEraGuildsPlugin plugin, UUID viewer) {
+        PlayerData pd = plugin.storage().getOrCreatePlayer(viewer);
+
+        Inventory inv = Bukkit.createInventory(null, 27, TITLE_ALIGNMENT);
+
+        for (int i = 0; i < 9; i++) inv.setItem(i, backPane());
+        for (int i = 9; i < 27; i++) inv.setItem(i, filler());
+
+        inv.setItem(11, item(Material.LIME_WOOL, "§aHonorable", lore(
+                "§7Score range: §f50 to 100",
+                "§7Current score: §f" + pd.getAlignmentScore()
+        )));
+
+        inv.setItem(13, item(Material.GRAY_WOOL, "§7Neutral", lore(
+                "§7Score range: §f-49 to 49",
+                "§7Current score: §f" + pd.getAlignmentScore()
+        )));
+
+        inv.setItem(15, item(Material.RED_WOOL, "§cDark", lore(
+                "§7Score range: §f-100 to -50",
+                "§7Current score: §f" + pd.getAlignmentScore()
+        )));
+
+        inv.setItem(22, item(Material.PAPER, "§bYour Alignment", lore(
+                "§7Alignment score is always tracked",
+                "§7even outside a guild.",
+                "",
+                "§7Score: §f" + pd.getAlignmentScore()
+        )));
+
+        return inv;
+    }
+
     public static Inventory yourGuildMenu(Guild g) {
         Inventory inv = Bukkit.createInventory(null, 27, TITLE_YOUR_GUILD);
 
         for (int i = 0; i < 9; i++) inv.setItem(i, backPane());
-
         for (int i = 9; i < 27; i++) inv.setItem(i, filler());
 
         inv.setItem(12, item(Material.CHEST, "§bGuild Vault", lore("§7Open the guild vault.")));
