@@ -20,6 +20,11 @@ public final class AlignmentWatcher implements Runnable {
         this.plugin = plugin;
     }
 
+    // Used by JoinListener for delayed execution
+    public MagicEraGuildsPlugin getPlugin() {
+        return plugin;
+    }
+
     @Override
     public void run() {
         for (Player p : Bukkit.getOnlinePlayers()) {
@@ -45,6 +50,7 @@ public final class AlignmentWatcher implements Runnable {
         GuildAlignment playerGroup = AlignmentUtil.groupFromScore(pd.getAlignmentScore());
         GuildAlignment guildGroup = g.getAlignment();
 
+        // If alignment matches, clear timer
         if (playerGroup == guildGroup) {
             if (pd.getOutOfAlignmentSinceEpochMs() != null) {
                 pd.setOutOfAlignmentSinceEpochMs(null);
@@ -55,6 +61,7 @@ public final class AlignmentWatcher implements Runnable {
 
         long now = System.currentTimeMillis();
         Long since = pd.getOutOfAlignmentSinceEpochMs();
+
         if (since == null) {
             pd.setOutOfAlignmentSinceEpochMs(now);
             plugin.storage().save();
@@ -75,12 +82,13 @@ public final class AlignmentWatcher implements Runnable {
         };
 
         String path = "alignment.messages." + key + "." + (isLogin ? "login" : "repeat");
-        String msg = plugin.getConfig().getString(path, "&7[Guild] Out of alignment. Time left: %timeleft%");
+        String msg = plugin.getConfig().getString(path,
+                "&7[Guild] Out of alignment. Time left: %timeleft%");
 
         msg = msg.replace("%timeleft%", timeLeft);
         p.sendMessage(Text.color(msg));
 
-        // Next increment: if remaining == 0 => auto-kick or other action.
+        // (Kick logic can be added later if remaining == 0)
     }
 
     private String formatTime(long ms) {
