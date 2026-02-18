@@ -95,6 +95,10 @@ public final class Storage {
                     PlayerData pd = new PlayerData(uuid);
                     pd.setGuildId(pSec.getString(uuidStr + ".guildId", null));
                     pd.setAlignmentScore(pSec.getInt(uuidStr + ".alignmentScore", 0));
+
+                    long since = pSec.getLong(uuidStr + ".outOfAlignmentSinceEpochMs", 0L);
+                    pd.setOutOfAlignmentSinceEpochMs(since == 0L ? null : since);
+
                     playersById.put(uuid, pd);
                 } catch (IllegalArgumentException ignored) {
                 }
@@ -128,6 +132,9 @@ public final class Storage {
             String base = "players." + p.getUuid();
             playersYaml.set(base + ".guildId", p.getGuildId());
             playersYaml.set(base + ".alignmentScore", p.getAlignmentScore());
+
+            Long since = p.getOutOfAlignmentSinceEpochMs();
+            playersYaml.set(base + ".outOfAlignmentSinceEpochMs", since == null ? 0L : since);
         }
 
         try {
