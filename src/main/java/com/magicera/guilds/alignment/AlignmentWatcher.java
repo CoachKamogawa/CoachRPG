@@ -81,11 +81,17 @@ public final class AlignmentWatcher implements Runnable {
             case DARK -> "dark";
         };
 
+        String restore = switch (guildGroup) {
+            case DARK -> "&cSin";
+            case NEUTRAL -> "&fBalance";
+            case HONORABLE -> "&aHonor";
+        };
+
         String path = "alignment.messages." + key + "." + (isLogin ? "login" : "repeat");
         String msg = plugin.getConfig().getString(path,
-                "&7[Guild] Out of alignment. Time left: %timeleft%");
+                "&7[&aGuild&7] &cYou are out of favor with your guild. You have &e%timeleft% &cto restore your %restore%&c.");
 
-        msg = msg.replace("%timeleft%", timeLeft);
+        msg = msg.replace("%timeleft%", timeLeft).replace("%restore%", Text.color(restore));
         p.sendMessage(Text.color(msg));
 
         // (Kick logic can be added later if remaining == 0)
