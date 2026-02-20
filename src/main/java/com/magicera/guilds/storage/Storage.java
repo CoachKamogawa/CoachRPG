@@ -81,6 +81,20 @@ public final class Storage {
 
                 guild.setKickLockUntilEpochMs(s.getLong("kickLockUntilEpochMs", 0L));
 
+                String homeWorld = s.getString("home.world");
+                if (homeWorld != null && s.contains("home.x") && s.contains("home.y") && s.contains("home.z")) {
+                    guild.setHome(homeWorld, s.getInt("home.x"), s.getInt("home.y"), s.getInt("home.z"));
+                }
+
+                guild.setMembersCanClaim(s.getBoolean("membersCanClaim", false));
+                guild.setInWar(s.getBoolean("inWar", false));
+                long warEnds = s.getLong("warEndsAtEpochMs", 0L);
+                guild.setWarEndsAtEpochMs(warEnds == 0L ? null : warEnds);
+
+                guild.getClaimedChunks().addAll(s.getStringList("claimedChunks"));
+                guild.getAllies().addAll(s.getStringList("allies"));
+                guild.getEnemies().addAll(s.getStringList("enemies"));
+
                 List<String> logs = s.getStringList("logEntries");
                 if (logs != null && !logs.isEmpty()) {
                     guild.getLogEntries().addAll(logs);
@@ -133,6 +147,8 @@ public final class Storage {
 
                     pd.setGuildTitle(pSec.getString(uuidStr + ".guildTitle", ""));
                     pd.setLastSeenEpochMs(pSec.getLong(uuidStr + ".lastSeenEpochMs", System.currentTimeMillis()));
+                    pd.setGuildChatEnabled(pSec.getBoolean(uuidStr + ".guildChatEnabled", false));
+                    pd.setPower(pSec.getDouble(uuidStr + ".power", 15.0));
 
                     playersById.put(uuid, pd);
                 } catch (IllegalArgumentException ignored) {
@@ -170,6 +186,18 @@ public final class Storage {
             guildsYaml.set(base + ".kickLockUntilEpochMs", g.getKickLockUntilEpochMs());
             guildsYaml.set(base + ".logEntries", g.getLogEntries());
 
+            guildsYaml.set(base + ".home.world", g.getHomeWorld());
+            guildsYaml.set(base + ".home.x", g.getHomeX());
+            guildsYaml.set(base + ".home.y", g.getHomeY());
+            guildsYaml.set(base + ".home.z", g.getHomeZ());
+
+            guildsYaml.set(base + ".membersCanClaim", g.isMembersCanClaim());
+            guildsYaml.set(base + ".inWar", g.isInWar());
+            guildsYaml.set(base + ".warEndsAtEpochMs", g.getWarEndsAtEpochMs() == null ? 0L : g.getWarEndsAtEpochMs());
+            guildsYaml.set(base + ".claimedChunks", new ArrayList<>(g.getClaimedChunks()));
+            guildsYaml.set(base + ".allies", new ArrayList<>(g.getAllies()));
+            guildsYaml.set(base + ".enemies", new ArrayList<>(g.getEnemies()));
+
             String memBase = base + ".members";
             guildsYaml.set(memBase, null);
             for (Map.Entry<UUID, GuildRole> e : g.getMembers().entrySet()) {
@@ -200,6 +228,8 @@ public final class Storage {
 
             playersYaml.set(base + ".guildTitle", p.getGuildTitle());
             playersYaml.set(base + ".lastSeenEpochMs", p.getLastSeenEpochMs());
+            playersYaml.set(base + ".guildChatEnabled", p.isGuildChatEnabled());
+            playersYaml.set(base + ".power", p.getPower());
         }
 
         try {
