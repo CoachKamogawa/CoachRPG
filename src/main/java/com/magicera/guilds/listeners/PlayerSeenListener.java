@@ -7,6 +7,8 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 
+import java.util.Locale;
+
 public final class PlayerSeenListener implements Listener {
 
     private final MagicEraGuildsPlugin plugin;
@@ -18,8 +20,20 @@ public final class PlayerSeenListener implements Listener {
     @EventHandler
     public void onJoin(PlayerJoinEvent e) {
         PlayerData pd = plugin.storage().getOrCreatePlayer(e.getPlayer().getUniqueId());
-        // mark as seen now so “last online” isn't ancient
+
+        // Mark as seen now so “last online” isn't ancient
         pd.setLastSeenEpochMs(System.currentTimeMillis());
+
+        // Offline tax notification
+        double pending = pd.getPendingTaxNoticeAmount();
+        if (pending > 0.0) {
+            e.getPlayer().sendMessage(
+                    "§7[§aGuild§7] §eYou were taxed while offline: §f$" +
+                    String.format(Locale.US, "%.2f", pending)
+            );
+            pd.setPendingTaxNoticeAmount(0.0);
+        }
+
         plugin.storage().save();
     }
 
