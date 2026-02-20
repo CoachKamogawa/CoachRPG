@@ -10,6 +10,8 @@ import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryCloseEvent;
 import org.bukkit.inventory.ItemStack;
 
+import java.util.*;
+
 public final class MenuListener implements Listener {
 
     private final MagicEraGuildsPlugin plugin;
@@ -48,6 +50,7 @@ public final class MenuListener implements Listener {
                 return;
             }
 
+            if (raw == 13) player.openInventory(Menus.guildListMenu(plugin, 0));
             if (raw == 15) player.openInventory(Menus.favorMenu(plugin, player.getUniqueId()));
             return;
         }
@@ -70,6 +73,10 @@ public final class MenuListener implements Listener {
             if (raw == 13) player.openInventory(Menus.membersMenu(plugin, g));
             if (raw == 14) player.openInventory(Menus.relationsMenu(plugin, g));
             if (raw == 15) player.openInventory(Menus.guildLogMenu(g, 0));
+            if (raw == 16) {
+                player.closeInventory();
+                player.performCommand("guild info");
+            }
             return;
         }
 
@@ -87,13 +94,32 @@ public final class MenuListener implements Listener {
 
             int page = parsePage(title);
 
-            if (raw < 9 && raw == 0) {
+            if (raw >= 1 && raw <= 7) {
                 player.openInventory(Menus.yourGuildMenu(g));
                 return;
             }
 
-            if (raw == 7 && page > 0) player.openInventory(Menus.guildLogMenu(g, page - 1));
+            if (raw == 0 && page > 0) player.openInventory(Menus.guildLogMenu(g, page - 1));
             if (raw == 8 && (page + 1) * 45 < g.getLogEntries().size()) player.openInventory(Menus.guildLogMenu(g, page + 1));
+            return;
+        }
+
+        if (title.startsWith(Menus.TITLE_GUILD_LIST)) {
+            event.setCancelled(true);
+            int page = parsePage(title);
+
+            if (raw >= 1 && raw <= 7) {
+                player.openInventory(Menus.mainMenu(plugin, player.getUniqueId()));
+                return;
+            }
+
+            int minMembers = Math.max(1, plugin.getConfig().getInt("guilds.guild-list-min-members", 3));
+            int total = (int) plugin.storage().allGuilds().stream()
+                    .filter(g1 -> g1.getMembers().size() >= minMembers)
+                    .count();
+
+            if (raw == 0 && page > 0) player.openInventory(Menus.guildListMenu(plugin, page - 1));
+            if (raw == 8 && (page + 1) * 45 < total) player.openInventory(Menus.guildListMenu(plugin, page + 1));
             return;
         }
 
@@ -150,13 +176,16 @@ public final class MenuListener implements Listener {
         if (g == null) return;
 
         ItemStack[] all = event.getInventory().getContents();
+        ItemStack[] oldStorage = plugin.vaults().loadVault(g.getId());
         ItemStack[] storage = new ItemStack[45];
         for (int i = 0; i < 45; i++) {
             storage[i] = all[i + 9];
         }
 
         plugin.vaults().saveVault(g.getId(), storage);
-        g.addLogEntry("Vault updated by " + player.getName());
+        for (String line : VaultLogUtil.diff(oldStorage, storage, player.getName())) {
+            g.addLogEntry(line);
+        }
         plugin.storage().save();
     }
 
@@ -168,6 +197,41 @@ public final class MenuListener implements Listener {
             return Math.max(0, Integer.parseInt(title.substring(i + 1, j).trim()) - 1);
         } catch (Exception ignored) {
             return 0;
+        }
+    }
+
+    private static final class VaultLogUtil {
+        static List<String> diff(ItemStack[] oldStorage, ItemStack[] newStorage, String actor) {
+            Map<String, Integer> oldCounts = count(oldStorage);
+            Map<String, Integer> newCounts = count(newStorage);
+            List<String> out = new ArrayList<>();
+
+            Set<String> keys = new HashSet<>();
+            keys.addAll(oldCounts.keySet());
+            keys.addAll(newCounts.keySet());
+
+            for (String key : keys) {
+                int before = oldCounts.getOrDefault(key, 0);
+                int after = newCounts.getOrDefault(key, 0);
+                int delta = after - before;
+                if (delta > 0) out.add("Vault add: " + actor + " +" + delta + " " + key);
+                if (delta < 0) out.add("Vault remove: " + actor + " " + delta + " " + key);
+            }
+            if (out.isEmpty()) out.add("Vault checked by " + actor + " (no item changes)");
+            return out;
+        }
+
+        private static Map<String, Integer> count(ItemStack[] items) {
+            Map<String, Integer> counts = new HashMap<>();
+            if (items == null) return counts;
+            for (ItemStack it : items) {
+                if (it == null || it.getType().isAir()) continue;
+                String name = it.hasItemMeta() && it.getItemMeta() != null && it.getItemMeta().hasDisplayName()
+                        ? org.bukkit.ChatColor.stripColor(it.getItemMeta().getDisplayName())
+                        : it.getType().name().toLowerCase(Locale.ROOT);
+                counts.merge(name, it.getAmount(), Integer::sum);
+            }
+            return counts;
         }
     }
 }
