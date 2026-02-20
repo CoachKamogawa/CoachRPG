@@ -8,6 +8,7 @@ import com.magicera.guilds.commands.GuildCommand;
 import com.magicera.guilds.commands.PartyCommand;
 import com.magicera.guilds.econ.EconomyHook;
 import com.magicera.guilds.gui.MenuListener;
+import com.magicera.guilds.guilds.GuildMaintenanceTask;
 import com.magicera.guilds.guilds.InviteManager;
 import com.magicera.guilds.guilds.VaultManager;
 import com.magicera.guilds.listeners.GuildChatListener;
@@ -92,6 +93,9 @@ public final class MagicEraGuildsPlugin extends JavaPlugin {
                     20L * 60L * warnMinutes,
                     20L * 60L * warnMinutes);
 
+            // Guild maintenance (auto-disband, auto-master, impeachment checks)
+            Bukkit.getScheduler().runTaskTimer(this, new GuildMaintenanceTask(this), 20L * 60L, 20L * 60L);
+
             getLogger().info("====================================");
             getLogger().info("MagicEraGuilds loaded successfully");
             getLogger().info("Author: Coach Kamogawa");
@@ -138,6 +142,8 @@ public final class MagicEraGuildsPlugin extends JavaPlugin {
                 }
 
                 guild.setBankBalance(guild.getBankBalance() + taxAmount);
+                guild.addLogEntry("Tax collected from " + (member.getName() == null ? member.getUniqueId() : member.getName())
+                        + " $" + String.format("%.2f", taxAmount));
                 chargedMembers++;
                 totalCollected += taxAmount;
             }
