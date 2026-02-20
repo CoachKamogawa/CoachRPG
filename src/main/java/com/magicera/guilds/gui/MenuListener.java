@@ -73,7 +73,7 @@ public final class MenuListener implements Listener {
             if (raw == 13) player.openInventory(Menus.membersMenu(plugin, g));
             if (raw == 14) player.openInventory(Menus.relationsMenu(plugin, g));
             if (raw == 15) player.openInventory(Menus.guildLogMenu(g, 0));
-            if (raw == 16) {
+            if (raw == 22) {
                 player.closeInventory();
                 player.performCommand("guild info");
             }
