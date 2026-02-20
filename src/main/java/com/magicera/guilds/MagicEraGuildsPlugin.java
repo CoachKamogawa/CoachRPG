@@ -13,7 +13,9 @@ import com.magicera.guilds.guilds.VaultManager;
 import com.magicera.guilds.listeners.PlayerSeenListener;
 import com.magicera.guilds.storage.Storage;
 import org.bukkit.Bukkit;
-import org.bukkit.plugin.PluginCommand;
+import org.bukkit.command.CommandExecutor;
+import org.bukkit.command.PluginCommand;
+import org.bukkit.command.TabCompleter;
 import org.bukkit.plugin.java.JavaPlugin;
 
 public final class MagicEraGuildsPlugin extends JavaPlugin {
@@ -46,12 +48,12 @@ public final class MagicEraGuildsPlugin extends JavaPlugin {
             boolean econOk = economyHook.setup();
 
             // -------------------------
-            // Commands (with tab-complete)
+            // Commands (executor + optional tab completer)
             // -------------------------
-            registerCommand("guild", new GuildCommand(this));
-            registerCommand("party", new PartyCommand(this));
-            registerCommand("duel", new DuelCommand(this));
-            registerCommand("favor", new FavorCommand(this));
+            registerCmd("guild", new GuildCommand(this));
+            registerCmd("party", new PartyCommand(this));
+            registerCmd("duel", new DuelCommand(this));
+            registerCmd("favor", new FavorCommand(this));
 
             // -------------------------
             // Listeners
@@ -59,7 +61,7 @@ public final class MagicEraGuildsPlugin extends JavaPlugin {
             Bukkit.getPluginManager().registerEvents(new MenuListener(this), this);
             Bukkit.getPluginManager().registerEvents(new PlayerSeenListener(this), this);
 
-            // Alignment watcher (still used for out-of-alignment warnings; names handled elsewhere)
+            // Favor/alignment watcher (still used for out-of-alignment warnings)
             alignmentWatcher = new AlignmentWatcher(this);
             Bukkit.getPluginManager().registerEvents(new JoinListener(alignmentWatcher), this);
 
@@ -106,15 +108,20 @@ public final class MagicEraGuildsPlugin extends JavaPlugin {
     }
 
     /**
-     * Registers executor + tab completer (works with TabExecutor).
+     * Registers a command executor, and if the executor also implements TabCompleter,
+     * registers it as the tab completer too.
      */
-    private void registerCommand(String name, org.bukkit.command.TabExecutor executor) {
+    private void registerCmd(String name, CommandExecutor executor) {
         PluginCommand cmd = getCommand(name);
         if (cmd == null) {
             getLogger().warning("Command '/" + name + "' is missing from plugin.yml (not registered).");
             return;
         }
+
         cmd.setExecutor(executor);
-        cmd.setTabCompleter(executor);
+
+        if (executor instanceof TabCompleter completer) {
+            cmd.setTabCompleter(completer);
+        }
     }
 }
