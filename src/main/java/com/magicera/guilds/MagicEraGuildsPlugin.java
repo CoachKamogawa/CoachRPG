@@ -12,6 +12,7 @@ import com.magicera.guilds.guilds.GuildMaintenanceTask;
 import com.magicera.guilds.guilds.InviteManager;
 import com.magicera.guilds.guilds.VaultManager;
 import com.magicera.guilds.listeners.GuildChatListener;
+import com.magicera.guilds.listeners.GuildProtectionListener;
 import com.magicera.guilds.listeners.PlayerSeenListener;
 import com.magicera.guilds.storage.Storage;
 import net.milkbowl.vault.economy.Economy;
@@ -70,6 +71,7 @@ public final class MagicEraGuildsPlugin extends JavaPlugin {
             Bukkit.getPluginManager().registerEvents(new MenuListener(this), this);
             Bukkit.getPluginManager().registerEvents(new PlayerSeenListener(this), this);
             Bukkit.getPluginManager().registerEvents(new GuildChatListener(this), this);
+            Bukkit.getPluginManager().registerEvents(new GuildProtectionListener(this), this);
 
             alignmentWatcher = new AlignmentWatcher(this);
             Bukkit.getPluginManager().registerEvents(new JoinListener(alignmentWatcher), this);
