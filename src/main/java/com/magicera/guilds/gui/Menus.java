@@ -87,13 +87,17 @@ public final class Menus {
         inv.setItem(13, item(Material.PLAYER_HEAD, "§bGuild Members", lore("§7View member list.")));
         inv.setItem(14, item(Material.IRON_SWORD, "§bRelations", lore("§7Allies and enemies.")));
         inv.setItem(15, item(Material.WRITABLE_BOOK, "§bGuild Log", lore("§7View guild activity.")));
-        inv.setItem(16, item(Material.BOOK, "§bGuild Info", lore("§7View guild details in chat.")));
 
-        inv.setItem(22, item(Material.BOOK, "§f" + Text.color(g.getName()), lore(
+        // Moved Guild Info to slot 22 (and expanded lore)
+        inv.setItem(22, item(Material.BOOK, "§bGuild Info", lore(
+                "§7View guild details in chat.",
+                "",
                 "§7Name: §r" + Text.color(g.getName()),
                 "§7Tag: §7[" + g.getPrefix() + "§7]",
                 "§7Favor: §f" + AlignmentUtil.displayName(g.getAlignment()),
-                "§7Type: §f" + AlignmentUtil.guildTypeName(g.getAlignment())
+                "§7Type: §f" + AlignmentUtil.guildTypeName(g.getAlignment()),
+                "",
+                "§eClick to view"
         )));
 
         return inv;
