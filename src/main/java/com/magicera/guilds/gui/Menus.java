@@ -28,6 +28,7 @@ public final class Menus {
     public static final String TITLE_VAULT = "§8Guild Vault";
     public static final String TITLE_MEMBERS = "§8Guild Members";
     public static final String TITLE_RELATIONS = "§8Relations";
+    public static final String TITLE_RELATION_GUILD = "§8Guild: ";
     public static final String TITLE_LOG = "§8Guild Log";
     public static final String TITLE_FAVOR = "§8Favor";
 
@@ -77,6 +78,7 @@ public final class Menus {
         for (int i = 0; i < 9; i++) inv.setItem(i, backPane());
         for (int i = 9; i < 27; i++) inv.setItem(i, filler());
 
+        inv.setItem(11, item(Material.OAK_DOOR, "§bGuild Home", lore("§7Teleport to guild home.")));
         inv.setItem(12, item(Material.CHEST, "§bGuild Vault", lore("§7Open the guild vault.")));
         inv.setItem(13, item(Material.PLAYER_HEAD, "§bGuild Members", lore("§7View member list.")));
         inv.setItem(14, item(Material.IRON_SWORD, "§bRelations", lore("§7Allies and enemies.")));
@@ -153,7 +155,9 @@ public final class Menus {
         for (int i = 0; i < 45; i++) {
             int idx = start + i;
             if (idx >= logs.size()) break;
-            inv.setItem(9 + i, item(Material.PAPER, "§fLog Entry", lore("§7" + logs.get(idx))));
+            String entry = logs.get(idx);
+            Material icon = logMaterial(entry);
+            inv.setItem(9 + i, item(icon, "§fLog Entry", lore("§7" + entry)));
         }
 
         inv.setItem(0, item(Material.RED_STAINED_GLASS_PANE, "§cBack", lore("§7Return")));
@@ -162,18 +166,46 @@ public final class Menus {
         return inv;
     }
 
-    public static Inventory relationsMenu(Guild g) {
+    public static Inventory relationsMenu(MagicEraGuildsPlugin plugin, Guild g) {
         Inventory inv = Bukkit.createInventory(null, 54, TITLE_RELATIONS);
 
         for (int i = 0; i < 9; i++) inv.setItem(i, backPane());
         for (int i = 9; i < 54; i++) inv.setItem(i, filler());
 
-        inv.setItem(22, item(Material.PAPER, "§bRelations", lore(
-                "§7Placeholder for now.",
-                "§7Allies/enemies next increment."
-        )));
+        int slot = 9;
+        for (String allyId : g.getAllies()) {
+            Guild ally = plugin.storage().getGuild(allyId);
+            if (ally == null || slot >= 54) continue;
+
+            UUID master = ally.getMembers().entrySet().stream()
+                    .filter(e -> e.getValue() == GuildRole.MASTER)
+                    .map(Map.Entry::getKey)
+                    .findFirst()
+                    .orElse(null);
+            if (master == null) continue;
+
+            OfflinePlayer off = Bukkit.getOfflinePlayer(master);
+
+            ItemStack head = playerHead(master, "§a" + Text.color(ally.getName()), lore(
+                    "§7Guild: §r" + Text.color(ally.getName()),
+                    "§7Tag: §7[" + ally.getPrefix() + "§7]",
+                    "§7Master: §f" + (off.getName() == null ? "Unknown" : off.getName()),
+                    "§7Members: §f" + ally.getMembers().size(),
+                    "",
+                    "§eClick to view members"
+            ));
+
+            inv.setItem(slot++, head);
+        }
 
         return inv;
+    }
+
+    public static Inventory relationGuildMembersMenu(MagicEraGuildsPlugin plugin, Guild g) {
+        Inventory inv = membersMenu(plugin, g);
+        Inventory ret = Bukkit.createInventory(null, 54, TITLE_RELATION_GUILD + Text.stripColors(g.getName()));
+        ret.setContents(inv.getContents());
+        return ret;
     }
 
     /**
@@ -258,6 +290,19 @@ public final class Menus {
         }
 
         return inv;
+    }
+
+    private static Material logMaterial(String entry) {
+        String lower = entry.toLowerCase();
+        if (lower.contains("deposit")) return Material.EMERALD;
+        if (lower.contains("withdraw")) return Material.GOLD_INGOT;
+        if (lower.contains("invite") || lower.contains("join")) return Material.PLAYER_HEAD;
+        if (lower.contains("kick") || lower.contains("remove")) return Material.IRON_SWORD;
+        if (lower.contains("tax")) return Material.SUNFLOWER;
+        if (lower.contains("war")) return Material.NETHERITE_SWORD;
+        if (lower.contains("ally")) return Material.LIME_BANNER;
+        if (lower.contains("claim")) return Material.GRASS_BLOCK;
+        return Material.PAPER;
     }
 
     private static ItemStack favorStatusPaper(GuildAlignment favor) {
