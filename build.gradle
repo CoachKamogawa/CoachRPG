@@ -33,3 +33,22 @@ tasks.withType(JavaCompile).configureEach {
 tasks.jar {
     archiveBaseName.set("MagicEraGuilds")
 }
+
+tasks.register("packagePluginZip", Zip) {
+    dependsOn(tasks.jar)
+    archiveBaseName.set("MagicEraGuilds")
+    archiveVersion.set(project.version.toString())
+    destinationDirectory.set(layout.buildDirectory.dir("distributions"))
+
+    // Put the built jar into a /plugins folder inside the zip
+    from(tasks.jar) {
+        into("plugins")
+    }
+
+    // Include README at the root of the zip (if it exists)
+    from("README.md")
+}
+
+tasks.assemble {
+    dependsOn(tasks.named("packagePluginZip"))
+}
