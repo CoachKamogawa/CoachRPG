@@ -15,10 +15,7 @@ import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.inventory.meta.SkullMeta;
 
 import java.time.Duration;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
+import java.util.*;
 
 public final class Menus {
 
@@ -43,6 +40,7 @@ public final class Menus {
             inv.setItem(11, item(Material.BOOK, "§bYour Guild", lore(
                     "§7Name: §r" + Text.color(g.getName()),
                     "§7Tag: §7[" + g.getPrefix() + "§7]",
+                    "§7Favor: §f" + AlignmentUtil.displayName(g.getAlignment()),
                     "§7Type: §f" + AlignmentUtil.guildTypeName(g.getAlignment()),
                     "",
                     "§eClick to open"
@@ -58,10 +56,10 @@ public final class Menus {
                 "§7Placeholder for now."
         )));
 
-        // Favor always accessible
-        int score = pd.getAlignmentScore();
+        // Favor entry (always accessible)
         inv.setItem(15, item(Material.NETHER_STAR, "§bFavor", lore(
-                "§7Your Favor Score: §f" + score,
+                "§7Your Favor:",
+                "§f" + AlignmentUtil.displayName(AlignmentUtil.groupFromScore(pd.getAlignmentScore())),
                 "",
                 "§eClick to open"
         )));
@@ -81,14 +79,14 @@ public final class Menus {
 
         inv.setItem(22, item(Material.BOOK, "§f" + Text.color(g.getName()), lore(
                 "§7Tag: §7[" + g.getPrefix() + "§7]",
-                "§7Type: §f" + AlignmentUtil.guildTypeName(g.getAlignment()),
-                "§7Favor: §f" + AlignmentUtil.displayName(g.getAlignment())
+                "§7Favor: §f" + AlignmentUtil.displayName(g.getAlignment()),
+                "§7Type: §f" + AlignmentUtil.guildTypeName(g.getAlignment())
         )));
 
         return inv;
     }
 
-    // 54 slots: top row UI bar, remaining 45 slots storage (index 9..53)
+    // 54 slots: top row is UI bar, remaining 45 slots are storage (index 9..53)
     public static Inventory vaultMenu(Guild g, double bankBalance) {
         Inventory inv = Bukkit.createInventory(null, 54, TITLE_VAULT);
 
@@ -152,81 +150,170 @@ public final class Menus {
     }
 
     /**
-     * Favor Menu: always available (guild not required)
-     * Center head + 5 pips per side.
-     * Left = Sin (red). Right = Honor (green). Neutral = white.
+     * Favor menu:
+     * - 6 panes per side (12 total), split across two rows to fit 9-wide inventories.
+     * - Wither skull at far-left end labeled §c§lSin
+     * - Nether star at far-right end labeled §a§lHonor
+     * - Player head in center
+     * - Bottom paper "Favor Status" with colored message
      */
     public static Inventory favorMenu(MagicEraGuildsPlugin plugin, UUID viewer) {
         PlayerData pd = plugin.storage().getOrCreatePlayer(viewer);
-        int score = pd.getAlignmentScore();
 
-        Inventory inv = Bukkit.createInventory(null, 27, TITLE_FAVOR);
+        int score = pd.getAlignmentScore(); // -100..100
+        var favor = AlignmentUtil.groupFromScore(score); // should map to SIN/BALANCE/HONOR via your util
 
-        for (int i = 0; i < 9; i++) inv.setItem(i, backPane());
-        for (int i = 9; i < 27; i++) inv.setItem(i, filler());
+        Inventory inv = Bukkit.createInventory(null, 45, TITLE_FAVOR);
 
-        inv.setItem(13, playerHead(Bukkit.getOfflinePlayer(viewer), score));
+        // background
+        for (int i = 0; i < inv.getSize(); i++) inv.setItem(i, filler());
 
-        int honorPips = calcPositivePips(score);
-        int sinPips = calcNegativePips(score);
+        // meter rows: row1 (slots 9..17) and row2 (slots 18..26)
+        // We use 3 panes per side on row1 + 3 panes per side on row2 = 6 per side total.
+        // Row2 also has endpoints + player head.
+        //
+        // Row1:
+        //  9 filler, 10-12 left panes, 13 filler, 14-16 right panes, 17 filler
+        //
+        // Row2:
+        //  18 WITHER_SKULL, 19-21 left panes, 22 PLAYER_HEAD, 23-25 right panes, 26 NETHER_STAR
 
-        int[] leftSlots = {12, 11, 10, 9, 21};     // Sin
-        int[] rightSlots = {14, 15, 16, 17, 23};   // Honor
+        // Endpoints
+        inv.setItem(18, item(Material.WITHER_SKELETON_SKULL, "§c§lSin", lore("§7The left path")));
+        inv.setItem(26, item(Material.NETHER_STAR, "§a§lHonor", lore("§7The right path")));
 
-        for (int i = 0; i < leftSlots.length; i++) {
-            boolean filled = i < sinPips;
-            inv.setItem(leftSlots[i],
-                    item(filled ? Material.RED_STAINED_GLASS_PANE : Material.WHITE_STAINED_GLASS_PANE,
-                            filled ? "§cSin" : "§f", null));
+        // Player head center
+        inv.setItem(22, playerHead(viewer, "§fYou", null));
+
+        // Compute fills (6 steps each side)
+        int steps = 6;
+        int fill = 0;
+
+        // Materials
+        Material emptyPane = Material.WHITE_STAINED_GLASS_PANE;
+        Material honorPane = Material.LIME_STAINED_GLASS_PANE;
+        Material sinPane = Material.RED_STAINED_GLASS_PANE;
+
+        // default: all empty
+        Material leftFillMat = sinPane;
+        Material rightFillMat = honorPane;
+
+        // Decide what to fill
+        boolean allSin = AlignmentUtil.isSin(favor);
+        boolean allHonor = AlignmentUtil.isHonor(favor);
+
+        if (allSin) {
+            // all panes red
+            setMeterPanes(inv, emptyPane, sinPane, steps, steps, true, true);
+        } else if (allHonor) {
+            // all panes green
+            setMeterPanes(inv, emptyPane, honorPane, steps, steps, true, true);
+        } else {
+            // Balance: fill based on score direction
+            if (score > 0) {
+                fill = (int) Math.ceil((Math.min(100, score) / 100.0) * steps);
+                fill = Math.max(0, Math.min(steps, fill));
+                // fill right only
+                setMeterPanes(inv, emptyPane, rightFillMat, 0, fill, false, true);
+            } else if (score < 0) {
+                int abs = Math.abs(score);
+                fill = (int) Math.ceil((Math.min(100, abs) / 100.0) * steps);
+                fill = Math.max(0, Math.min(steps, fill));
+                // fill left only
+                setMeterPanes(inv, emptyPane, leftFillMat, fill, 0, true, false);
+            } else {
+                // zero: all empty
+                setMeterPanes(inv, emptyPane, null, 0, 0, true, true);
+            }
         }
 
-        for (int i = 0; i < rightSlots.length; i++) {
-            boolean filled = i < honorPips;
-            inv.setItem(rightSlots[i],
-                    item(filled ? Material.LIME_STAINED_GLASS_PANE : Material.WHITE_STAINED_GLASS_PANE,
-                            filled ? "§aHonor" : "§f", null));
-        }
+        // Favor Status paper bottom center (slot 40)
+        inv.setItem(40, favorStatusPaper(favor));
 
-        inv.setItem(22, item(Material.PAPER, "§bFavor Status", lore(
-                "§7Score: §f" + score,
-                "",
-                score >= 50 ? "§aHonor"
-                        : score <= -50 ? "§cSin"
-                        : "§7Balance"
-        )));
-
+        // Optional "go back" (if you want it later) could be slot 36 etc.
         return inv;
     }
 
-    private static int calcPositivePips(int score) {
-        if (score <= 0) return 0;
-        if (score >= 100) return 5;
-        return (int) Math.ceil(score / 20.0);
+    // ---------- Favor menu helpers ----------
+
+    /**
+     * Places the empty panes, then overlays filled panes on the left/right.
+     * leftFill/rightFill are 0..steps.
+     *
+     * Layout for panes:
+     * Left panes: 10,11,12 and 19,20,21  (3+3 = 6)
+     * Right panes: 14,15,16 and 23,24,25 (3+3 = 6)
+     */
+    private static void setMeterPanes(Inventory inv, Material empty, Material fillMat,
+                                      int leftFill, int rightFill,
+                                      boolean setLeft, boolean setRight) {
+
+        int[] leftSlots = new int[]{10, 11, 12, 19, 20, 21};
+        int[] rightSlots = new int[]{14, 15, 16, 23, 24, 25};
+
+        // base empty
+        if (setLeft) for (int s : leftSlots) inv.setItem(s, item(empty, " ", null));
+        if (setRight) for (int s : rightSlots) inv.setItem(s, item(empty, " ", null));
+
+        if (fillMat == null) return;
+
+        // Fill from center outward feels better for "meter" readability.
+        // Left side: fill nearest-to-center first -> slots [12,11,10,21,20,19] (still 6 total)
+        int[] leftOrder = new int[]{12, 11, 10, 21, 20, 19};
+        // Right side: fill nearest-to-center first -> [14,15,16,23,24,25]
+        int[] rightOrder = new int[]{14, 15, 16, 23, 24, 25};
+
+        for (int i = 0; i < Math.min(leftFill, leftOrder.length); i++) {
+            inv.setItem(leftOrder[i], item(fillMat, " ", null));
+        }
+        for (int i = 0; i < Math.min(rightFill, rightOrder.length); i++) {
+            inv.setItem(rightOrder[i], item(fillMat, " ", null));
+        }
     }
 
-    private static int calcNegativePips(int score) {
-        if (score >= 0) return 0;
-        if (score <= -100) return 5;
-        return (int) Math.ceil(Math.abs(score) / 20.0);
+    private static ItemStack favorStatusPaper(Object favorEnum) {
+        // We rely on AlignmentUtil for name mapping
+        String favorName = AlignmentUtil.displayName(favorEnum); // "Sin" / "Balance" / "Honor"
+
+        // message + color based on favor
+        String msg;
+        String color;
+
+        if (AlignmentUtil.isHonor(favorEnum)) {
+            color = "§a";
+            msg = "Your deeds have been recognized by the world.";
+        } else if (AlignmentUtil.isSin(favorEnum)) {
+            color = "§c";
+            msg = "Your stage is the abyss.";
+        } else {
+            color = "§7";
+            msg = "You choose to walk your own path.";
+        }
+
+        return item(Material.PAPER, "§fFavor Status", lore(
+                "§7Current: " + color + favorName,
+                "",
+                color + msg
+        ));
     }
 
-    private static ItemStack playerHead(OfflinePlayer player, int score) {
+    private static ItemStack playerHead(UUID uuid, String name, List<String> lore) {
         ItemStack head = new ItemStack(Material.PLAYER_HEAD);
         ItemMeta meta = head.getItemMeta();
         if (meta instanceof SkullMeta sm) {
-            sm.setOwningPlayer(player);
-            sm.setDisplayName("§bYour Favor");
-
-            String group = score >= 50 ? "§aHonor" : (score <= -50 ? "§cSin" : "§7Balance");
-
-            sm.setLore(lore(
-                    "§7Score: §f" + score,
-                    "§7Status: " + group
-            ));
+            sm.setOwningPlayer(Bukkit.getOfflinePlayer(uuid));
+            sm.setDisplayName(name);
+            if (lore != null) sm.setLore(lore);
             head.setItemMeta(sm);
+        } else if (meta != null) {
+            meta.setDisplayName(name);
+            if (lore != null) meta.setLore(lore);
+            head.setItemMeta(meta);
         }
         return head;
     }
+
+    // ---------- existing utility ----------
 
     private static String formatLastOnline(boolean isOnline, long lastSeenMs) {
         if (isOnline) return "Online";
