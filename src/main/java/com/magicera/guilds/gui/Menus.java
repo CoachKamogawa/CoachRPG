@@ -28,6 +28,7 @@ public final class Menus {
     public static final String TITLE_VAULT = "§8Guild Vault";
     public static final String TITLE_MEMBERS = "§8Guild Members";
     public static final String TITLE_RELATIONS = "§8Relations";
+    public static final String TITLE_LOG = "§8Guild Log";
     public static final String TITLE_FAVOR = "§8Favor";
 
     public static Inventory mainMenu(MagicEraGuildsPlugin plugin, UUID viewer) {
@@ -40,7 +41,7 @@ public final class Menus {
         if (g != null) {
             inv.setItem(11, item(Material.BOOK, "§bYour Guild", lore(
                     "§7Name: §r" + Text.color(g.getName()),
-                    "§7Title: §r" + (g.getTitle().isEmpty() ? "§7None" : Text.color(g.getTitle())),
+                    "§7Your Title: §r" + (pd.getGuildTitle().isEmpty() ? "§7None" : Text.color(pd.getGuildTitle())),
                     "§7Tag: §7[" + g.getPrefix() + "§7]",
                     "§7Favor: §f" + AlignmentUtil.displayName(g.getAlignment()),
                     "§7Type: §f" + AlignmentUtil.guildTypeName(g.getAlignment()),
@@ -79,9 +80,9 @@ public final class Menus {
         inv.setItem(12, item(Material.CHEST, "§bGuild Vault", lore("§7Open the guild vault.")));
         inv.setItem(13, item(Material.PLAYER_HEAD, "§bGuild Members", lore("§7View member list.")));
         inv.setItem(14, item(Material.IRON_SWORD, "§bRelations", lore("§7Allies and enemies.")));
+        inv.setItem(15, item(Material.WRITABLE_BOOK, "§bGuild Log", lore("§7View guild activity.")));
 
-        String guildTitle = g.getTitle().isEmpty() ? g.getName() : g.getTitle();
-        inv.setItem(22, item(Material.BOOK, "§f" + Text.color(guildTitle), lore(
+        inv.setItem(22, item(Material.BOOK, "§f" + Text.color(g.getName()), lore(
                 "§7Name: §r" + Text.color(g.getName()),
                 "§7Tag: §7[" + g.getPrefix() + "§7]",
                 "§7Favor: §f" + AlignmentUtil.displayName(g.getAlignment()),
@@ -92,7 +93,7 @@ public final class Menus {
     }
 
     // 54 slots: top row is UI bar, remaining 45 slots are storage (index 9..53)
-    public static Inventory vaultMenu(Guild g, double bankBalance) {
+    public static Inventory vaultMenu(MagicEraGuildsPlugin plugin, Guild g, double bankBalance) {
         Inventory inv = Bukkit.createInventory(null, 54, TITLE_VAULT);
 
         for (int i = 0; i < 9; i++) inv.setItem(i, backPane());
@@ -101,7 +102,9 @@ public final class Menus {
                 "§7Balance: §f$" + (long) bankBalance
         )));
 
-        for (int i = 9; i < 54; i++) inv.setItem(i, null);
+        ItemStack[] contents = plugin.vaults().loadVault(g.getId());
+        for (int i = 9; i < 54; i++) inv.setItem(i, contents[i - 9]);
+
         return inv;
     }
 
@@ -137,6 +140,25 @@ public final class Menus {
             inv.setItem(slot++, head);
         }
 
+        return inv;
+    }
+
+    public static Inventory guildLogMenu(Guild g, int page) {
+        Inventory inv = Bukkit.createInventory(null, 54, TITLE_LOG + " §7(" + (page + 1) + ")");
+        for (int i = 0; i < 9; i++) inv.setItem(i, backPane());
+        for (int i = 9; i < 54; i++) inv.setItem(i, filler());
+
+        int start = page * 45;
+        List<String> logs = g.getLogEntries();
+        for (int i = 0; i < 45; i++) {
+            int idx = start + i;
+            if (idx >= logs.size()) break;
+            inv.setItem(9 + i, item(Material.PAPER, "§fLog Entry", lore("§7" + logs.get(idx))));
+        }
+
+        inv.setItem(0, item(Material.RED_STAINED_GLASS_PANE, "§cBack", lore("§7Return")));
+        inv.setItem(7, item(Material.LIME_STAINED_GLASS_PANE, "§aPrev", lore("§7Previous page")));
+        inv.setItem(8, item(Material.LIGHT_BLUE_STAINED_GLASS_PANE, "§bNext", lore("§7Next page")));
         return inv;
     }
 
