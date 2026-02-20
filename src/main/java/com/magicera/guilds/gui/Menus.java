@@ -40,6 +40,7 @@ public final class Menus {
         if (g != null) {
             inv.setItem(11, item(Material.BOOK, "§bYour Guild", lore(
                     "§7Name: §r" + Text.color(g.getName()),
+                    "§7Title: §r" + (g.getTitle().isEmpty() ? "§7None" : Text.color(g.getTitle())),
                     "§7Tag: §7[" + g.getPrefix() + "§7]",
                     "§7Favor: §f" + AlignmentUtil.displayName(g.getAlignment()),
                     "§7Type: §f" + AlignmentUtil.guildTypeName(g.getAlignment()),
@@ -79,7 +80,9 @@ public final class Menus {
         inv.setItem(13, item(Material.PLAYER_HEAD, "§bGuild Members", lore("§7View member list.")));
         inv.setItem(14, item(Material.IRON_SWORD, "§bRelations", lore("§7Allies and enemies.")));
 
-        inv.setItem(22, item(Material.BOOK, "§f" + Text.color(g.getName()), lore(
+        String guildTitle = g.getTitle().isEmpty() ? g.getName() : g.getTitle();
+        inv.setItem(22, item(Material.BOOK, "§f" + Text.color(guildTitle), lore(
+                "§7Name: §r" + Text.color(g.getName()),
                 "§7Tag: §7[" + g.getPrefix() + "§7]",
                 "§7Favor: §f" + AlignmentUtil.displayName(g.getAlignment()),
                 "§7Type: §f" + AlignmentUtil.guildTypeName(g.getAlignment())
@@ -181,12 +184,6 @@ public final class Menus {
         for (int i = 36; i < 45; i++) inv.setItem(i, filler());
         inv.setItem(40, favorStatusPaper(favor)); // center
 
-        // Row 3: favor bar (slots 18..26)
-        // 4 left: 19-22, head center: 23, 4 right: 24-27? (careful: row 3 is 18-26)
-        // We'll use:
-        // left panes: 19,20,21,22
-        // head: 23
-        // right panes: 24,25,26,18 (wrap looks bad) -> so we keep it simple:
         // Row 3 layout is: [18][19][20][21][22][23][24][25][26]
         // We'll do: left panes = 18,19,20,21 | head = 22 | right panes = 23,24,25,26
         int[] left = new int[]{18, 19, 20, 21};
@@ -219,7 +216,6 @@ public final class Menus {
             if (score > 0) {
                 int fill = (int) Math.ceil((Math.min(100, score) / 100.0) * steps);
                 fill = Math.max(0, Math.min(steps, fill));
-                // fill from near-center outward on RIGHT: start at 23 -> 26
                 for (int i = 0; i < fill; i++) {
                     inv.setItem(right[i], item(Material.LIME_STAINED_GLASS_PANE, " ", null));
                 }
@@ -227,7 +223,6 @@ public final class Menus {
                 int abs = Math.abs(score);
                 int fill = (int) Math.ceil((Math.min(100, abs) / 100.0) * steps);
                 fill = Math.max(0, Math.min(steps, fill));
-                // fill from near-center outward on LEFT: start at 21 -> 18
                 int[] leftNearCenterFirst = new int[]{21, 20, 19, 18};
                 for (int i = 0; i < fill; i++) {
                     inv.setItem(leftNearCenterFirst[i], item(Material.RED_STAINED_GLASS_PANE, " ", null));
