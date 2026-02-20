@@ -11,17 +11,16 @@ import com.magicera.guilds.util.Text;
 import net.milkbowl.vault.economy.Economy;
 import net.milkbowl.vault.economy.EconomyResponse;
 import org.bukkit.Bukkit;
-import org.bukkit.OfflinePlayer;
 import org.bukkit.command.Command;
-import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
+import org.bukkit.command.TabExecutor;
 import org.bukkit.entity.Player;
 
 import java.text.DecimalFormat;
-import java.util.Map;
-import java.util.UUID;
+import java.util.*;
+import java.util.stream.Collectors;
 
-public final class GuildCommand implements CommandExecutor {
+public final class GuildCommand implements TabExecutor {
 
     private final MagicEraGuildsPlugin plugin;
     private final DecimalFormat moneyFmt = new DecimalFormat("#,##0.00");
@@ -29,6 +28,10 @@ public final class GuildCommand implements CommandExecutor {
     public GuildCommand(MagicEraGuildsPlugin plugin) {
         this.plugin = plugin;
     }
+
+    // -------------------------
+    // EXECUTE
+    // -------------------------
 
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
@@ -90,7 +93,6 @@ public final class GuildCommand implements CommandExecutor {
             sender.sendMessage("§7Guild bank balance: §a$" + fmt(g.getBankBalance()));
             sender.sendMessage("§7Guild tax: §e" + g.getTaxPercent() + "%");
             sender.sendMessage("§7Guild type: §f" + AlignmentUtil.guildTypeName(g.getAlignment()));
-            sender.sendMessage("§7Guild favor: §f" + AlignmentUtil.displayName(g.getAlignment()));
             return true;
         }
 
@@ -184,7 +186,7 @@ public final class GuildCommand implements CommandExecutor {
                 return true;
             }
 
-            GuildRole role = roleOf(g, player.getUniqueId());
+            GuildRole role = g.getMembers().get(player.getUniqueId());
             if (role != GuildRole.MASTER && role != GuildRole.OFFICER) {
                 sender.sendMessage("§cOnly Guild Master or Officer can withdraw.");
                 return true;
@@ -276,7 +278,7 @@ public final class GuildCommand implements CommandExecutor {
                 return true;
             }
 
-            GuildRole role = roleOf(g, player.getUniqueId());
+            GuildRole role = g.getMembers().get(player.getUniqueId());
             if (role != GuildRole.MASTER) {
                 sender.sendMessage("§cOnly the Guild Master can set tax.");
                 return true;
@@ -289,135 +291,7 @@ public final class GuildCommand implements CommandExecutor {
         }
 
         // -------------------------
-        // Promote / Demote (NEW)
-        // -------------------------
-
-        if (sub.equals("promote")) {
-            if (!(sender instanceof Player actor)) {
-                sender.sendMessage("§cPlayers only.");
-                return true;
-            }
-            if (args.length < 2) {
-                sender.sendMessage("§cUsage: /guild promote <player>");
-                return true;
-            }
-
-            PlayerData actorData = plugin.storage().getOrCreatePlayer(actor.getUniqueId());
-            if (actorData.getGuildId() == null) {
-                sender.sendMessage("§cYou are not in a guild.");
-                return true;
-            }
-
-            Guild g = plugin.storage().getGuild(actorData.getGuildId());
-            if (g == null) {
-                actorData.setGuildId(null);
-                plugin.storage().save();
-                sender.sendMessage("§cYour guild data was missing.");
-                return true;
-            }
-
-            if (roleOf(g, actor.getUniqueId()) != GuildRole.MASTER) {
-                sender.sendMessage("§cOnly the Guild Master can promote members.");
-                return true;
-            }
-
-            UUID targetId = resolveUuid(args[1]);
-            if (targetId == null) {
-                sender.sendMessage("§cUnknown player: §f" + args[1]);
-                return true;
-            }
-
-            if (targetId.equals(actor.getUniqueId())) {
-                sender.sendMessage("§cYou cannot promote yourself.");
-                return true;
-            }
-
-            if (!g.getMembers().containsKey(targetId)) {
-                sender.sendMessage("§cThat player is not in your guild.");
-                return true;
-            }
-
-            GuildRole current = roleOf(g, targetId);
-            if (current == GuildRole.MASTER) {
-                sender.sendMessage("§cYou cannot change the Guild Master's role.");
-                return true;
-            }
-            if (current == GuildRole.OFFICER) {
-                sender.sendMessage("§cThat player is already an Officer.");
-                return true;
-            }
-
-            g.setRole(targetId, GuildRole.OFFICER);
-            plugin.storage().save();
-
-            broadcastToGuild(g, "§a[Guild] §f" + nameOf(targetId) + " §awas promoted to §eOfficer§a.");
-            return true;
-        }
-
-        if (sub.equals("demote")) {
-            if (!(sender instanceof Player actor)) {
-                sender.sendMessage("§cPlayers only.");
-                return true;
-            }
-            if (args.length < 2) {
-                sender.sendMessage("§cUsage: /guild demote <player>");
-                return true;
-            }
-
-            PlayerData actorData = plugin.storage().getOrCreatePlayer(actor.getUniqueId());
-            if (actorData.getGuildId() == null) {
-                sender.sendMessage("§cYou are not in a guild.");
-                return true;
-            }
-
-            Guild g = plugin.storage().getGuild(actorData.getGuildId());
-            if (g == null) {
-                actorData.setGuildId(null);
-                plugin.storage().save();
-                sender.sendMessage("§cYour guild data was missing.");
-                return true;
-            }
-
-            if (roleOf(g, actor.getUniqueId()) != GuildRole.MASTER) {
-                sender.sendMessage("§cOnly the Guild Master can demote officers.");
-                return true;
-            }
-
-            UUID targetId = resolveUuid(args[1]);
-            if (targetId == null) {
-                sender.sendMessage("§cUnknown player: §f" + args[1]);
-                return true;
-            }
-
-            if (targetId.equals(actor.getUniqueId())) {
-                sender.sendMessage("§cYou cannot demote yourself.");
-                return true;
-            }
-
-            if (!g.getMembers().containsKey(targetId)) {
-                sender.sendMessage("§cThat player is not in your guild.");
-                return true;
-            }
-
-            GuildRole current = roleOf(g, targetId);
-            if (current == GuildRole.MASTER) {
-                sender.sendMessage("§cYou cannot change the Guild Master's role.");
-                return true;
-            }
-            if (current == GuildRole.MEMBER) {
-                sender.sendMessage("§cThat player is already a Member.");
-                return true;
-            }
-
-            g.setRole(targetId, GuildRole.MEMBER);
-            plugin.storage().save();
-
-            broadcastToGuild(g, "§c[Guild] §f" + nameOf(targetId) + " §cwas demoted to §7Member§c.");
-            return true;
-        }
-
-        // -------------------------
-        // Existing guild features
+        // Guild create / invite / accept / deny / disband
         // -------------------------
 
         if (sub.equals("create")) {
@@ -472,10 +346,8 @@ public final class GuildCommand implements CommandExecutor {
 
             plugin.storage().save();
 
-            sender.sendMessage("§aCreated guild: §r" + Text.color(g.getName())
-                    + " §7[" + g.getPrefix() + "§7]"
-                    + " §7Type: §f" + AlignmentUtil.guildTypeName(masterAlign)
-                    + " §7Favor: §f" + AlignmentUtil.displayName(masterAlign));
+            sender.sendMessage("§aCreated guild: §r" + Text.color(g.getName()) + " §7[" + g.getPrefix() + "§7] §7Favor: §f"
+                    + AlignmentUtil.displayName(masterAlign));
             return true;
         }
 
@@ -503,7 +375,7 @@ public final class GuildCommand implements CommandExecutor {
                 return true;
             }
 
-            GuildRole role = roleOf(guild, inviter.getUniqueId());
+            GuildRole role = guild.getMembers().get(inviter.getUniqueId());
             if (role != GuildRole.MASTER && role != GuildRole.OFFICER) {
                 sender.sendMessage("§cOnly Guild Master or Officer can invite.");
                 return true;
@@ -529,19 +401,15 @@ public final class GuildCommand implements CommandExecutor {
             GuildAlignment guildAlign = guild.getAlignment();
             GuildAlignment targetAlign = AlignmentUtil.groupFromScore(targetData.getAlignmentScore());
 
-            // Only same Favor can join; Neutral (Balance) can be snapped when they accept
             if (targetAlign != GuildAlignment.NEUTRAL && targetAlign != guildAlign) {
-                sender.sendMessage("§cThat player is out of Favor and cannot join this guild.");
+                sender.sendMessage("§cThat player is out of favor and cannot join this guild.");
                 return true;
             }
 
             plugin.inviteManager().setInvite(target.getUniqueId(), guild.getId(), inviter.getUniqueId());
 
-            sender.sendMessage("§aInvited §f" + target.getName() + " §ato §r" + Text.color(guild.getName())
-                    + " §7[" + guild.getPrefix() + "§7]");
-
-            target.sendMessage("§7[§bMagicEra§7] §fYou were invited to join §r" + Text.color(guild.getName())
-                    + " §7[" + guild.getPrefix() + "§7]");
+            sender.sendMessage("§aInvited §f" + target.getName() + " §ato §r" + Text.color(guild.getName()) + " §7[" + guild.getPrefix() + "§7]");
+            target.sendMessage("§7[§bMagicEra§7] §fYou were invited to join §r" + Text.color(guild.getName()) + " §7[" + guild.getPrefix() + "§7]");
             target.sendMessage("§7Type §a/guild accept §7or §c/guild deny");
             return true;
         }
@@ -583,7 +451,6 @@ public final class GuildCommand implements CommandExecutor {
             GuildAlignment guildAlign = guild.getAlignment();
             GuildAlignment playerAlign = AlignmentUtil.groupFromScore(pd.getAlignmentScore());
 
-            // Snap Balance -> guild on accept (if guild isn't Balance)
             if (playerAlign == GuildAlignment.NEUTRAL && guildAlign != GuildAlignment.NEUTRAL) {
                 int snapped = AlignmentUtil.snapScoreToGuild(guildAlign);
                 pd.setAlignmentScore(snapped);
@@ -592,7 +459,7 @@ public final class GuildCommand implements CommandExecutor {
 
             if (playerAlign != guildAlign) {
                 plugin.inviteManager().clearInvite(player);
-                sender.sendMessage("§cYou are out of Favor and cannot join this guild.");
+                sender.sendMessage("§cYou are out of favor and cannot join this guild.");
                 return true;
             }
 
@@ -604,7 +471,6 @@ public final class GuildCommand implements CommandExecutor {
             plugin.storage().save();
 
             sender.sendMessage("§aYou joined §r" + Text.color(guild.getName()) + " §7[" + guild.getPrefix() + "§7]");
-
             Bukkit.broadcastMessage("§b[Magic Era] §f" + player.getName() + " has joined " + Text.color(guild.getName()) + "§f.");
 
             if (plugin.alignmentWatcher() != null) {
@@ -634,7 +500,7 @@ public final class GuildCommand implements CommandExecutor {
                 return true;
             }
 
-            GuildRole role = roleOf(g, player.getUniqueId());
+            GuildRole role = g.getMembers().get(player.getUniqueId());
             if (role != GuildRole.MASTER) {
                 sender.sendMessage("§cOnly the Guild Master can disband the guild.");
                 return true;
@@ -660,6 +526,66 @@ public final class GuildCommand implements CommandExecutor {
         return true;
     }
 
+    // -------------------------
+    // TAB COMPLETE
+    // -------------------------
+
+    @Override
+    public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
+        String input = args.length == 0 ? "" : args[args.length - 1];
+
+        // /guild <sub>
+        if (args.length == 1) {
+            List<String> subs = new ArrayList<>(List.of(
+                    "help", "menu",
+                    "create", "invite", "accept", "deny", "disband",
+                    "bank", "deposit", "withdraw", "tax"
+            ));
+            if (sender.hasPermission("magicera.admin")) subs.add("reload");
+            return filterPrefix(subs, input);
+        }
+
+        String sub = args[0].toLowerCase();
+
+        // /guild invite <player>
+        if (sub.equals("invite") && args.length == 2) {
+            return filterPrefix(onlinePlayerNames(), input);
+        }
+
+        // /guild create "<name>" <displayName>
+        // Can't tab-complete quoted name well. We can at least hint displayName spot:
+        if (sub.equals("create") && args.length == 3) {
+            return filterPrefix(List.of("&aWR", "&cDR", "&7IG"), input);
+        }
+
+        // /guild deposit <amount> or withdraw <amount> or tax <0-9>
+        if ((sub.equals("deposit") || sub.equals("withdraw")) && args.length == 2) {
+            return filterPrefix(List.of("100", "250", "500", "1000"), input);
+        }
+        if (sub.equals("tax") && args.length == 2) {
+            return filterPrefix(List.of("0","1","2","3","4","5","6","7","8","9"), input);
+        }
+
+        // /guild help
+        return Collections.emptyList();
+    }
+
+    private List<String> onlinePlayerNames() {
+        return Bukkit.getOnlinePlayers().stream().map(Player::getName).sorted().collect(Collectors.toList());
+    }
+
+    private List<String> filterPrefix(Collection<String> options, String input) {
+        String low = input == null ? "" : input.toLowerCase();
+        return options.stream()
+                .filter(s -> s.toLowerCase().startsWith(low))
+                .sorted()
+                .collect(Collectors.toList());
+    }
+
+    // -------------------------
+    // HELP + PARSING
+    // -------------------------
+
     private void sendHelp(CommandSender sender) {
         sender.sendMessage("§7/guild menu");
         sender.sendMessage("§7/guild create \"<name>\" <displayName>");
@@ -667,18 +593,13 @@ public final class GuildCommand implements CommandExecutor {
         sender.sendMessage("§7/guild invite <player>");
         sender.sendMessage("§7/guild accept");
         sender.sendMessage("§7/guild deny");
-        sender.sendMessage("§7/guild promote <player>");
-        sender.sendMessage("§7/guild demote <player>");
         sender.sendMessage("§7/guild disband");
         sender.sendMessage("§7/guild bank");
         sender.sendMessage("§7/guild deposit <amount>");
         sender.sendMessage("§7/guild withdraw <amount>");
         sender.sendMessage("§7/guild tax <0-9>");
-        sender.sendMessage("§7/guild reload");
-        sender.sendMessage("§7/favor §8(open Favor menu)");
+        if (sender.hasPermission("magicera.admin")) sender.sendMessage("§7/guild reload");
     }
-
-    // ----- helpers -----
 
     private static final class ParsedCreate {
         final String guildName;
@@ -753,39 +674,6 @@ public final class GuildCommand implements CommandExecutor {
             return Double.parseDouble(cleaned);
         } catch (Exception e) {
             return -1.0;
-        }
-    }
-
-    private GuildRole roleOf(Guild g, UUID uuid) {
-        GuildRole r = g.getMembers().get(uuid);
-        return (r == null) ? GuildRole.MEMBER : r;
-    }
-
-    private UUID resolveUuid(String name) {
-        Player online = Bukkit.getPlayerExact(name);
-        if (online != null) return online.getUniqueId();
-
-        OfflinePlayer off = Bukkit.getOfflinePlayer(name);
-        if (off == null) return null;
-
-        if (!off.hasPlayedBefore()) return null;
-        return off.getUniqueId();
-    }
-
-    private String nameOf(UUID uuid) {
-        Player online = Bukkit.getPlayer(uuid);
-        if (online != null) return online.getName();
-
-        OfflinePlayer off = Bukkit.getOfflinePlayer(uuid);
-        if (off != null && off.getName() != null) return off.getName();
-
-        return uuid.toString();
-    }
-
-    private void broadcastToGuild(Guild g, String msg) {
-        for (Map.Entry<UUID, GuildRole> e : g.getMembers().entrySet()) {
-            Player p = Bukkit.getPlayer(e.getKey());
-            if (p != null) p.sendMessage(msg);
         }
     }
 }
