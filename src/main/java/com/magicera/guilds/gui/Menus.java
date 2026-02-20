@@ -152,12 +152,13 @@ public final class Menus {
     }
 
     /**
-     * Favor menu:
-     * - 6 panes per side (12 total)
-     * - Wither skull on far left: §c§lSin
-     * - Nether star on far right: §a§lHonor
-     * - Player head center
-     * - Paper bottom: "Favor Status" + message based on favor
+     * Favor menu: 9x6 (expanded)
+     *
+     * Row 1: red "Go Back" panes
+     * Row 2: black panes
+     * Row 3-4: favor bar (6 meters per side across two rows)
+     * Row 5: black panes
+     * Row 6: bottom bar (pane color depends on favor) + center paper "Favor Status"
      */
     public static Inventory favorMenu(MagicEraGuildsPlugin plugin, UUID viewer) {
         PlayerData pd = plugin.storage().getOrCreatePlayer(viewer);
@@ -165,56 +166,90 @@ public final class Menus {
         int score = pd.getAlignmentScore(); // -100..100
         GuildAlignment favor = AlignmentUtil.groupFromScore(score);
 
-        Inventory inv = Bukkit.createInventory(null, 45, TITLE_FAVOR);
+        Inventory inv = Bukkit.createInventory(null, 54, TITLE_FAVOR);
 
-        for (int i = 0; i < inv.getSize(); i++) inv.setItem(i, filler());
+        // Row 1: back bar
+        for (int i = 0; i < 9; i++) inv.setItem(i, backPane());
 
-        // Endpoints + center head
+        // Row 2: black panes
+        for (int i = 9; i < 18; i++) inv.setItem(i, filler());
+
+        // Row 5: black panes
+        for (int i = 36; i < 45; i++) inv.setItem(i, filler());
+
+        // Row 6: favor-colored panes + paper center
+        Material bottom = favorBottomPaneMaterial(favor);
+        for (int i = 45; i < 54; i++) inv.setItem(i, item(bottom, " ", null));
+        inv.setItem(49, favorStatusPaper(favor)); // center (row 6 col 5)
+
+        // --- Favor bar (rows 3-4) ---
+        // Row 3 slots 18..26
+        // [18] skull | [19][20][21] left meters | [22] player head | [23][24][25] right meters | [26] star
         inv.setItem(18, item(Material.WITHER_SKELETON_SKULL, "§c§lSin", lore("§7The left path")));
         inv.setItem(22, playerHead(viewer, "§fYou", null));
         inv.setItem(26, item(Material.NETHER_STAR, "§a§lHonor", lore("§7The right path")));
 
-        int steps = 6; // 6 panes per side
-        Material empty = Material.WHITE_STAINED_GLASS_PANE;
+        // Row 4 slots 27..35
+        // We'll put remaining meters here:
+        // [27] filler | [28][29][30] left meters | [31] filler | [32][33][34] right meters | [35] filler
+        inv.setItem(27, filler());
+        inv.setItem(31, filler());
+        inv.setItem(35, filler());
 
-        // base empty panes
-        int[] leftSlots = new int[]{10, 11, 12, 19, 20, 21};
-        int[] rightSlots = new int[]{14, 15, 16, 23, 24, 25};
-        for (int s : leftSlots) inv.setItem(s, item(empty, " ", null));
-        for (int s : rightSlots) inv.setItem(s, item(empty, " ", null));
+        // Meter slot lists (6 per side)
+        // Left meters: 19,20,21, 30,29,28 (so it feels like it continues downward/outward cleanly)
+        // Right meters: 23,24,25, 32,33,34
+        int[] leftMeters = new int[]{19, 20, 21, 30, 29, 28};
+        int[] rightMeters = new int[]{23, 24, 25, 32, 33, 34};
 
-        // fill order nearest-to-center first
-        int[] leftOrder = new int[]{12, 11, 10, 21, 20, 19};
-        int[] rightOrder = new int[]{14, 15, 16, 23, 24, 25};
+        // Default: WHITE (unfilled)
+        for (int s : leftMeters) inv.setItem(s, item(Material.WHITE_STAINED_GLASS_PANE, " ", null));
+        for (int s : rightMeters) inv.setItem(s, item(Material.WHITE_STAINED_GLASS_PANE, " ", null));
 
+        // Fill behavior:
+        // Sin: all meters red
+        // Honor: all meters lime
+        // Balance: fill one side based on score sign, proportionally (1-6)
         if (favor == GuildAlignment.DARK) {
-            // all red
-            for (int s : leftSlots) inv.setItem(s, item(Material.RED_STAINED_GLASS_PANE, " ", null));
-            for (int s : rightSlots) inv.setItem(s, item(Material.RED_STAINED_GLASS_PANE, " ", null));
+            for (int s : leftMeters) inv.setItem(s, item(Material.RED_STAINED_GLASS_PANE, " ", null));
+            for (int s : rightMeters) inv.setItem(s, item(Material.RED_STAINED_GLASS_PANE, " ", null));
         } else if (favor == GuildAlignment.HONORABLE) {
-            // all green
-            for (int s : leftSlots) inv.setItem(s, item(Material.LIME_STAINED_GLASS_PANE, " ", null));
-            for (int s : rightSlots) inv.setItem(s, item(Material.LIME_STAINED_GLASS_PANE, " ", null));
+            for (int s : leftMeters) inv.setItem(s, item(Material.LIME_STAINED_GLASS_PANE, " ", null));
+            for (int s : rightMeters) inv.setItem(s, item(Material.LIME_STAINED_GLASS_PANE, " ", null));
         } else {
-            // Balance: fill only one side based on score sign
+            int steps = 6;
+
             if (score > 0) {
                 int fill = (int) Math.ceil((Math.min(100, score) / 100.0) * steps);
                 fill = Math.max(0, Math.min(steps, fill));
+
+                // Fill from near-center outward in our rightMeters order
                 for (int i = 0; i < fill; i++) {
-                    inv.setItem(rightOrder[i], item(Material.LIME_STAINED_GLASS_PANE, " ", null));
+                    inv.setItem(rightMeters[i], item(Material.LIME_STAINED_GLASS_PANE, " ", null));
                 }
             } else if (score < 0) {
                 int abs = Math.abs(score);
                 int fill = (int) Math.ceil((Math.min(100, abs) / 100.0) * steps);
                 fill = Math.max(0, Math.min(steps, fill));
+
+                // Fill from near-center outward in our leftMeters order
                 for (int i = 0; i < fill; i++) {
-                    inv.setItem(leftOrder[i], item(Material.RED_STAINED_GLASS_PANE, " ", null));
+                    inv.setItem(leftMeters[i], item(Material.RED_STAINED_GLASS_PANE, " ", null));
                 }
             }
         }
 
-        inv.setItem(40, favorStatusPaper(favor));
         return inv;
+    }
+
+    private static Material favorBottomPaneMaterial(GuildAlignment favor) {
+        // Requested:
+        // white = balance
+        // red = sin
+        // light green = honor
+        if (favor == GuildAlignment.HONORABLE) return Material.LIME_STAINED_GLASS_PANE;
+        if (favor == GuildAlignment.DARK) return Material.RED_STAINED_GLASS_PANE;
+        return Material.WHITE_STAINED_GLASS_PANE;
     }
 
     private static ItemStack favorStatusPaper(GuildAlignment favor) {
@@ -223,6 +258,10 @@ public final class Menus {
         String color;
         String msg;
 
+        // Messages requested:
+        // Balance = "You choose to walk your own path."
+        // Honor = "Your deeds have been recognized by the world."
+        // Sin = "Your stage is the abyss."
         if (favor == GuildAlignment.HONORABLE) {
             color = "§a";
             msg = "Your deeds have been recognized by the world.";
