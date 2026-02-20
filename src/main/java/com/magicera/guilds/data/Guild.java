@@ -1,10 +1,6 @@
 package com.magicera.guilds.data;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
+import java.util.*;
 
 public final class Guild {
 
@@ -31,6 +27,19 @@ public final class Guild {
     private long kickLockUntilEpochMs;
     private final Map<UUID, Boolean> impeachmentVotes = new HashMap<>();
 
+    private String homeWorld;
+    private Integer homeX;
+    private Integer homeY;
+    private Integer homeZ;
+
+    private boolean membersCanClaim;
+    private boolean inWar;
+    private Long warEndsAtEpochMs;
+
+    private final Set<String> claimedChunks = new HashSet<>();
+    private final Set<String> allies = new HashSet<>();
+    private final Set<String> enemies = new HashSet<>();
+
     public Guild(String id, String name, String prefix, GuildAlignment alignment) {
         this.id = id;
         this.name = name;
@@ -46,6 +55,15 @@ public final class Guild {
         this.masterOutOfFavorSinceEpochMs = null;
         this.impeachmentStartedEpochMs = null;
         this.kickLockUntilEpochMs = 0L;
+
+        this.homeWorld = null;
+        this.homeX = null;
+        this.homeY = null;
+        this.homeZ = null;
+
+        this.membersCanClaim = false;
+        this.inWar = false;
+        this.warEndsAtEpochMs = null;
     }
 
     public String getId() { return id; }
@@ -100,6 +118,47 @@ public final class Guild {
     public void setKickLockUntilEpochMs(long ms) { this.kickLockUntilEpochMs = Math.max(0L, ms); }
 
     public Map<UUID, Boolean> getImpeachmentVotes() { return impeachmentVotes; }
+
+    public String getHomeWorld() { return homeWorld; }
+    public Integer getHomeX() { return homeX; }
+    public Integer getHomeY() { return homeY; }
+    public Integer getHomeZ() { return homeZ; }
+
+    public void setHome(String world, int x, int y, int z) {
+        this.homeWorld = world;
+        this.homeX = x;
+        this.homeY = y;
+        this.homeZ = z;
+    }
+
+    public boolean hasHome() {
+        return homeWorld != null && homeX != null && homeY != null && homeZ != null;
+    }
+
+    public boolean isMembersCanClaim() { return membersCanClaim; }
+    public void setMembersCanClaim(boolean membersCanClaim) { this.membersCanClaim = membersCanClaim; }
+
+    public boolean isInWar() { return inWar; }
+    public void setInWar(boolean inWar) { this.inWar = inWar; }
+
+    public Long getWarEndsAtEpochMs() { return warEndsAtEpochMs; }
+    public void setWarEndsAtEpochMs(Long warEndsAtEpochMs) { this.warEndsAtEpochMs = warEndsAtEpochMs; }
+
+    public Set<String> getClaimedChunks() { return claimedChunks; }
+    public Set<String> getAllies() { return allies; }
+    public Set<String> getEnemies() { return enemies; }
+
+    public static String chunkKey(String world, int x, int z) {
+        return world + ":" + x + ":" + z;
+    }
+
+    public boolean claimsChunk(String world, int x, int z) {
+        return claimedChunks.contains(chunkKey(world, x, z));
+    }
+
+    public void claimChunk(String world, int x, int z) {
+        claimedChunks.add(chunkKey(world, x, z));
+    }
 
     public void addLogEntry(String entry) {
         logEntries.add(0, entry);
