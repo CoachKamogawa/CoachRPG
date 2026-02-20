@@ -7,6 +7,8 @@ import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.inventory.InventoryClickEvent;
+import org.bukkit.event.inventory.InventoryCloseEvent;
+import org.bukkit.inventory.ItemStack;
 
 public final class MenuListener implements Listener {
 
@@ -25,18 +27,12 @@ public final class MenuListener implements Listener {
 
         if (raw < 0 || raw >= event.getView().getTopInventory().getSize()) return;
 
-        // Favor menu always accessible
         if (title.equals(Menus.TITLE_FAVOR)) {
             event.setCancelled(true);
-
-            // Back bar
-            if (raw >= 0 && raw < 9) {
-                player.openInventory(Menus.mainMenu(plugin, player.getUniqueId()));
-            }
+            if (raw >= 0 && raw < 9) player.openInventory(Menus.mainMenu(plugin, player.getUniqueId()));
             return;
         }
 
-        // Main menu
         if (title.equals(Menus.TITLE_MAIN)) {
             event.setCancelled(true);
 
@@ -47,28 +43,18 @@ public final class MenuListener implements Listener {
                     return;
                 }
                 Guild g = plugin.storage().getGuild(pd.getGuildId());
-                if (g == null) {
-                    pd.setGuildId(null);
-                    plugin.storage().save();
-                    player.sendMessage("§cYour guild data was missing.");
-                    return;
-                }
+                if (g == null) return;
                 player.openInventory(Menus.yourGuildMenu(g));
                 return;
             }
 
-            if (raw == 15) {
-                player.openInventory(Menus.favorMenu(plugin, player.getUniqueId()));
-                return;
-            }
-
+            if (raw == 15) player.openInventory(Menus.favorMenu(plugin, player.getUniqueId()));
             return;
         }
 
         PlayerData pd = plugin.storage().getOrCreatePlayer(player.getUniqueId());
         Guild g = pd.getGuildId() == null ? null : plugin.storage().getGuild(pd.getGuildId());
 
-        // Your guild menu
         if (title.equals(Menus.TITLE_YOUR_GUILD)) {
             event.setCancelled(true);
 
@@ -77,54 +63,77 @@ public final class MenuListener implements Listener {
                 return;
             }
 
-            if (g == null) {
-                player.sendMessage("§cYou are not in a guild.");
-                player.openInventory(Menus.mainMenu(plugin, player.getUniqueId()));
-                return;
-            }
+            if (g == null) return;
 
-            if (raw == 12) {
-                player.openInventory(Menus.vaultMenu(g, g.getBankBalance()));
-                return;
-            }
-            if (raw == 13) {
-                player.openInventory(Menus.membersMenu(plugin, g));
-                return;
-            }
-            if (raw == 14) {
-                player.openInventory(Menus.relationsMenu(g));
-                return;
-            }
+            if (raw == 12) player.openInventory(Menus.vaultMenu(plugin, g, g.getBankBalance()));
+            if (raw == 13) player.openInventory(Menus.membersMenu(plugin, g));
+            if (raw == 14) player.openInventory(Menus.relationsMenu(g));
+            if (raw == 15) player.openInventory(Menus.guildLogMenu(g, 0));
             return;
         }
 
-        // Vault
         if (title.equals(Menus.TITLE_VAULT)) {
-            event.setCancelled(true);
-            if (raw >= 0 && raw < 9) {
+            if (raw < 9) {
+                event.setCancelled(true);
                 if (g != null) player.openInventory(Menus.yourGuildMenu(g));
-                else player.openInventory(Menus.mainMenu(plugin, player.getUniqueId()));
             }
             return;
         }
 
-        // Members
-        if (title.equals(Menus.TITLE_MEMBERS)) {
+        if (title.startsWith(Menus.TITLE_LOG)) {
             event.setCancelled(true);
-            if (raw >= 0 && raw < 9) {
-                if (g != null) player.openInventory(Menus.yourGuildMenu(g));
-                else player.openInventory(Menus.mainMenu(plugin, player.getUniqueId()));
+            if (g == null) return;
+
+            int page = parsePage(title);
+
+            if (raw < 9 && raw == 0) {
+                player.openInventory(Menus.yourGuildMenu(g));
+                return;
             }
+
+            if (raw == 7 && page > 0) player.openInventory(Menus.guildLogMenu(g, page - 1));
+            if (raw == 8 && (page + 1) * 45 < g.getLogEntries().size()) player.openInventory(Menus.guildLogMenu(g, page + 1));
             return;
         }
 
-        // Relations
-        if (title.equals(Menus.TITLE_RELATIONS)) {
+        if (title.equals(Menus.TITLE_MEMBERS) || title.equals(Menus.TITLE_RELATIONS)) {
             event.setCancelled(true);
             if (raw >= 0 && raw < 9) {
                 if (g != null) player.openInventory(Menus.yourGuildMenu(g));
                 else player.openInventory(Menus.mainMenu(plugin, player.getUniqueId()));
             }
+        }
+    }
+
+    @EventHandler
+    public void onClose(InventoryCloseEvent event) {
+        if (!(event.getPlayer() instanceof Player player)) return;
+        if (!event.getView().getTitle().equals(Menus.TITLE_VAULT)) return;
+
+        PlayerData pd = plugin.storage().getOrCreatePlayer(player.getUniqueId());
+        if (pd.getGuildId() == null) return;
+        Guild g = plugin.storage().getGuild(pd.getGuildId());
+        if (g == null) return;
+
+        ItemStack[] all = event.getInventory().getContents();
+        ItemStack[] storage = new ItemStack[45];
+        for (int i = 0; i < 45; i++) {
+            storage[i] = all[i + 9];
+        }
+
+        plugin.vaults().saveVault(g.getId(), storage);
+        g.addLogEntry("Vault updated by " + player.getName());
+        plugin.storage().save();
+    }
+
+    private int parsePage(String title) {
+        int i = title.indexOf('(');
+        int j = title.indexOf(')');
+        if (i < 0 || j < 0 || j <= i) return 0;
+        try {
+            return Math.max(0, Integer.parseInt(title.substring(i + 1, j).trim()) - 1);
+        } catch (Exception ignored) {
+            return 0;
         }
     }
 }
