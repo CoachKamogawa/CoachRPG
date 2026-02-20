@@ -2,8 +2,8 @@ package com.magicera.guilds;
 
 import com.magicera.guilds.alignment.AlignmentWatcher;
 import com.magicera.guilds.alignment.JoinListener;
-import com.magicera.guilds.commands.AlignmentCommand;
 import com.magicera.guilds.commands.DuelCommand;
+import com.magicera.guilds.commands.FavorCommand;
 import com.magicera.guilds.commands.GuildCommand;
 import com.magicera.guilds.commands.PartyCommand;
 import com.magicera.guilds.econ.EconomyHook;
@@ -50,19 +50,15 @@ public final class MagicEraGuildsPlugin extends JavaPlugin {
             if (getCommand("guild") != null) getCommand("guild").setExecutor(new GuildCommand(this));
             if (getCommand("party") != null) getCommand("party").setExecutor(new PartyCommand(this));
             if (getCommand("duel") != null) getCommand("duel").setExecutor(new DuelCommand(this));
-            if (getCommand("alignment") != null) getCommand("alignment").setExecutor(new AlignmentCommand(this));
+            if (getCommand("favor") != null) getCommand("favor").setExecutor(new FavorCommand(this));
 
             // -------------------------
             // Listeners
             // -------------------------
-
-            // GUI listener (handles /guild menu and /align menus)
             Bukkit.getPluginManager().registerEvents(new MenuListener(this), this);
-
-            // Player last-seen tracking
             Bukkit.getPluginManager().registerEvents(new PlayerSeenListener(this), this);
 
-            // Alignment join check
+            // Alignment watcher (still used for out-of-alignment warnings; names are handled in util)
             alignmentWatcher = new AlignmentWatcher(this);
             Bukkit.getPluginManager().registerEvents(new JoinListener(alignmentWatcher), this);
 
@@ -82,9 +78,6 @@ public final class MagicEraGuildsPlugin extends JavaPlugin {
                     20L * 60L * warnMinutes,
                     20L * 60L * warnMinutes);
 
-            // -------------------------
-            // Startup log
-            // -------------------------
             getLogger().info("====================================");
             getLogger().info("MagicEraGuilds loaded successfully");
             getLogger().info("Author: Coach Kamogawa");
