@@ -24,6 +24,12 @@ jobs:
       - name: Build
         run: gradle build
 
+      - name: Upload plugin zip
+        uses: actions/upload-artifact@v4
+        with:
+          name: MagicEraGuilds-plugin-zip
+          path: build/distributions/*.zip
+
       - name: Upload jar
         uses: actions/upload-artifact@v4
         with:
