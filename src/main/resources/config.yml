@@ -4,6 +4,7 @@ data:
 
 guilds:
   inactivity-autodisbands-days: 30
+  impeach-min-members: 10
 
 claims:
   leader-start-chunks: 4
@@ -24,11 +25,11 @@ alignment:
 
   messages:
     honorable:
-      login: "&a[Guild] &fYou are out of alignment for your guild. You have &e%timeleft%&f remaining to fix it."
-      repeat: "&a[Guild] &fOut of alignment. Time left: &e%timeleft%&f."
+      login: "&7[&aGuild&7] &cYou are out of favor with your guild. You have &e%timeleft% &cto restore your %restore%&c."
+      repeat: "&7[&aGuild&7] &cYou are out of favor with your guild. You have &e%timeleft% &cto restore your %restore%&c."
     neutral:
-      login: "&7[Guild] &fYou are out of alignment for your guild. You have &e%timeleft%&f remaining to fix it."
-      repeat: "&7[Guild] &fOut of alignment. Time left: &e%timeleft%&f."
+      login: "&7[&aGuild&7] &cYou are out of favor with your guild. You have &e%timeleft% &cto restore your %restore%&c."
+      repeat: "&7[&aGuild&7] &cYou are out of favor with your guild. You have &e%timeleft% &cto restore your %restore%&c."
     dark:
-      login: "&c[Guild] &fYou are out of alignment for your guild. You have &e%timeleft%&f remaining to fix it."
-      repeat: "&c[Guild] &fOut of alignment. Time left: &e%timeleft%&f."
+      login: "&7[&aGuild&7] &cYou are out of favor with your guild. You have &e%timeleft% &cto restore your %restore%&c."
+      repeat: "&7[&aGuild&7] &cYou are out of favor with your guild. You have &e%timeleft% &cto restore your %restore%&c."
