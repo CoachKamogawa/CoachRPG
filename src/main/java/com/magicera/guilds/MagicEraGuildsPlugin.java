@@ -146,6 +146,15 @@ public final class MagicEraGuildsPlugin extends JavaPlugin {
                 guild.setBankBalance(guild.getBankBalance() + taxAmount);
                 guild.addLogEntry("Tax collected from " + (member.getName() == null ? member.getUniqueId() : member.getName())
                         + " $" + String.format("%.2f", taxAmount));
+
+                var pd = storage.getOrCreatePlayer(entry.getKey());
+                if (member.isOnline() && member.getPlayer() != null) {
+                    member.getPlayer().sendMessage("§7[§aGuild§7] §eYou have been taxed: §f$" + String.format("%.2f", taxAmount)
+                            + " §7(" + taxPercent + "%)");
+                } else {
+                    pd.setPendingTaxNoticeAmount(pd.getPendingTaxNoticeAmount() + taxAmount);
+                }
+
                 chargedMembers++;
                 totalCollected += taxAmount;
             }
