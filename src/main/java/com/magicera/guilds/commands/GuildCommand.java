@@ -480,6 +480,319 @@ public final class GuildCommand implements TabExecutor {
             return true;
         }
 
+
+        if (sub.equals("leave")) {
+            if (!(sender instanceof Player player)) {
+                sender.sendMessage("§cPlayers only.");
+                return true;
+            }
+
+            PlayerData pd = plugin.storage().getOrCreatePlayer(player.getUniqueId());
+            if (pd.getGuildId() == null) {
+                sender.sendMessage("§cYou are not in a guild.");
+                return true;
+            }
+
+            Guild guild = plugin.storage().getGuild(pd.getGuildId());
+            if (guild == null) {
+                pd.setGuildId(null);
+                plugin.storage().save();
+                sender.sendMessage("§cYour guild data was missing.");
+                return true;
+            }
+
+            GuildRole role = guild.getMembers().get(player.getUniqueId());
+            if (role == GuildRole.MASTER) {
+                sender.sendMessage("§cGuild Master cannot leave. Use /guild newmaster first or /guild disband.");
+                return true;
+            }
+
+            guild.getMembers().remove(player.getUniqueId());
+            pd.setGuildId(null);
+            pd.setGuildTitle("");
+            pd.setOutOfAlignmentSinceEpochMs(null);
+            plugin.storage().save();
+
+            sender.sendMessage("§aYou left guild §r" + Text.color(guild.getName()) + "§a.");
+            return true;
+        }
+
+        if (sub.equals("kick")) {
+            if (!(sender instanceof Player player)) {
+                sender.sendMessage("§cPlayers only.");
+                return true;
+            }
+            if (args.length < 2) {
+                sender.sendMessage("§cUsage: /guild kick <player>");
+                if (sender.hasPermission("magicera.admin")) sender.sendMessage("§cAdmin usage: /guild kick <player> <guild>");
+                return true;
+            }
+
+            if (args.length >= 3 && sender.hasPermission("magicera.admin")) {
+                UUID targetId = resolvePlayerUuid(args[1]);
+                if (targetId == null) {
+                    sender.sendMessage("§cUnknown player: " + args[1]);
+                    return true;
+                }
+
+                String guildId = Text.normalizeId(args[2]);
+                Guild guild = plugin.storage().getGuild(guildId);
+                if (guild == null) {
+                    sender.sendMessage("§cUnknown guild: " + args[2]);
+                    return true;
+                }
+
+                PlayerData targetPd = plugin.storage().getOrCreatePlayer(targetId);
+                GuildRole targetRole = guild.getMembers().get(targetId);
+                if (targetRole == GuildRole.MASTER) {
+                    sender.sendMessage("§cCannot admin-kick the Guild Master. Transfer master first.");
+                    return true;
+                }
+                if (!guild.getMembers().containsKey(targetId) && !guild.getId().equals(targetPd.getGuildId())) {
+                    sender.sendMessage("§cThat player is not in that guild.");
+                    return true;
+                }
+
+                guild.getMembers().remove(targetId);
+                if (guild.getId().equals(targetPd.getGuildId())) {
+                    targetPd.setGuildId(null);
+                    targetPd.setGuildTitle("");
+                    targetPd.setOutOfAlignmentSinceEpochMs(null);
+                }
+                plugin.storage().save();
+                sender.sendMessage("§aRemoved §f" + safeName(targetId) + " §afrom guild §r" + Text.color(guild.getName()) + "§a.");
+                return true;
+            }
+
+            PlayerData actor = plugin.storage().getOrCreatePlayer(player.getUniqueId());
+            if (actor.getGuildId() == null) {
+                sender.sendMessage("§cYou are not in a guild.");
+                return true;
+            }
+
+            Guild guild = plugin.storage().getGuild(actor.getGuildId());
+            if (guild == null) {
+                actor.setGuildId(null);
+                plugin.storage().save();
+                sender.sendMessage("§cYour guild data was missing.");
+                return true;
+            }
+
+            GuildRole actorRole = guild.getMembers().get(player.getUniqueId());
+            if (actorRole != GuildRole.MASTER) {
+                sender.sendMessage("§cOnly the Guild Master can kick members.");
+                return true;
+            }
+
+            UUID targetId = resolvePlayerUuid(args[1]);
+            if (targetId == null) {
+                sender.sendMessage("§cUnknown player: " + args[1]);
+                return true;
+            }
+            if (targetId.equals(player.getUniqueId())) {
+                sender.sendMessage("§cUse /guild leave if you want to leave.");
+                return true;
+            }
+
+            GuildRole targetRole = guild.getMembers().get(targetId);
+            if (targetRole == null) {
+                sender.sendMessage("§cThat player is not in your guild.");
+                return true;
+            }
+
+            guild.getMembers().remove(targetId);
+            PlayerData targetPd = plugin.storage().getOrCreatePlayer(targetId);
+            if (guild.getId().equals(targetPd.getGuildId())) {
+                targetPd.setGuildId(null);
+                targetPd.setGuildTitle("");
+                targetPd.setOutOfAlignmentSinceEpochMs(null);
+            }
+            plugin.storage().save();
+
+            String targetName = Bukkit.getOfflinePlayer(targetId).getName();
+            if (targetName == null) targetName = targetId.toString();
+            sender.sendMessage("§aKicked §f" + targetName + " §afrom the guild.");
+
+            Player online = Bukkit.getPlayer(targetId);
+            if (online != null) online.sendMessage("§cYou were kicked from guild " + Text.color(guild.getName()) + "§c.");
+            return true;
+        }
+
+        if (sub.equals("newmaster")) {
+            if (!(sender instanceof Player player)) {
+                sender.sendMessage("§cPlayers only.");
+                return true;
+            }
+            if (args.length < 2) {
+                sender.sendMessage("§cUsage: /guild newmaster <player>");
+                return true;
+            }
+
+            PlayerData actor = plugin.storage().getOrCreatePlayer(player.getUniqueId());
+            if (actor.getGuildId() == null) {
+                sender.sendMessage("§cYou are not in a guild.");
+                return true;
+            }
+
+            Guild guild = plugin.storage().getGuild(actor.getGuildId());
+            if (guild == null) {
+                actor.setGuildId(null);
+                plugin.storage().save();
+                sender.sendMessage("§cYour guild data was missing.");
+                return true;
+            }
+
+            GuildRole actorRole = guild.getMembers().get(player.getUniqueId());
+            if (actorRole != GuildRole.MASTER) {
+                sender.sendMessage("§cOnly the Guild Master can transfer leadership.");
+                return true;
+            }
+
+            UUID targetId = resolvePlayerUuid(args[1]);
+            if (targetId == null) {
+                sender.sendMessage("§cUnknown player: " + args[1]);
+                return true;
+            }
+            if (targetId.equals(player.getUniqueId())) {
+                sender.sendMessage("§cYou are already the Guild Master.");
+                return true;
+            }
+
+            if (guild.getMembers().get(targetId) == null) {
+                sender.sendMessage("§cThat player is not in your guild.");
+                return true;
+            }
+
+            guild.setRole(player.getUniqueId(), GuildRole.MEMBER);
+            guild.setRole(targetId, GuildRole.MASTER);
+            plugin.storage().save();
+
+            String targetName = Bukkit.getOfflinePlayer(targetId).getName();
+            if (targetName == null) targetName = targetId.toString();
+            sender.sendMessage("§aGuild leadership transferred to §f" + targetName + "§a.");
+            Player online = Bukkit.getPlayer(targetId);
+            if (online != null) online.sendMessage("§aYou are now the Guild Master of " + Text.color(guild.getName()) + "§a.");
+            return true;
+        }
+
+        if (sub.equals("title")) {
+            if (!(sender instanceof Player player)) {
+                sender.sendMessage("§cPlayers only.");
+                return true;
+            }
+            if (args.length < 2) {
+                sender.sendMessage("§cUsage: /guild title <text|clear>");
+                return true;
+            }
+
+            PlayerData actor = plugin.storage().getOrCreatePlayer(player.getUniqueId());
+            if (actor.getGuildId() == null) {
+                sender.sendMessage("§cYou are not in a guild.");
+                return true;
+            }
+
+            Guild guild = plugin.storage().getGuild(actor.getGuildId());
+            if (guild == null) {
+                actor.setGuildId(null);
+                plugin.storage().save();
+                sender.sendMessage("§cYour guild data was missing.");
+                return true;
+            }
+
+            GuildRole actorRole = guild.getMembers().get(player.getUniqueId());
+            if (actorRole != GuildRole.MASTER) {
+                sender.sendMessage("§cOnly the Guild Master can set the guild title.");
+                return true;
+            }
+
+            String value = joinArgs(args, 1);
+            if (value.equalsIgnoreCase("clear")) {
+                guild.setTitle("");
+                plugin.storage().save();
+                sender.sendMessage("§aGuild title cleared.");
+                return true;
+            }
+
+            String stripped = Text.stripColors(value).trim();
+            if (stripped.isEmpty() || stripped.length() > 24) {
+                sender.sendMessage("§cGuild title must be 1-24 visible characters.");
+                return true;
+            }
+
+            guild.setTitle(Text.color(value));
+            plugin.storage().save();
+            sender.sendMessage("§aGuild title set to: §r" + guild.getTitle());
+            return true;
+        }
+
+        if (sub.equals("add") || sub.equals("adminadd") || sub.equals("adminkick")) {
+            if (!sender.hasPermission("magicera.admin")) {
+                sender.sendMessage("§cNo permission.");
+                return true;
+            }
+            if (args.length < 3) {
+                sender.sendMessage("§cUsage: /guild add <player> <guild>");
+                sender.sendMessage("§cUsage: /guild adminkick <player> <guild>");
+                return true;
+            }
+
+            UUID targetId = resolvePlayerUuid(args[1]);
+            if (targetId == null) {
+                sender.sendMessage("§cUnknown player: " + args[1]);
+                return true;
+            }
+
+            String guildId = Text.normalizeId(args[2]);
+            Guild guild = plugin.storage().getGuild(guildId);
+            if (guild == null) {
+                sender.sendMessage("§cUnknown guild: " + args[2]);
+                return true;
+            }
+
+            PlayerData targetPd = plugin.storage().getOrCreatePlayer(targetId);
+            Guild oldGuild = targetPd.getGuildId() == null ? null : plugin.storage().getGuild(targetPd.getGuildId());
+
+            if (sub.equals("add") || sub.equals("adminadd")) {
+                if (targetPd.getGuildId() != null && oldGuild != null) {
+                    oldGuild.getMembers().remove(targetId);
+                }
+                targetPd.setGuildId(guild.getId());
+                targetPd.setGuildTitle("");
+                targetPd.setOutOfAlignmentSinceEpochMs(null);
+                guild.setRole(targetId, GuildRole.MEMBER);
+                plugin.storage().save();
+                sender.sendMessage("§aAdded §f" + safeName(targetId) + " §ato guild §r" + Text.color(guild.getName()) + "§a.");
+            } else {
+                if (!guild.getMembers().containsKey(targetId) && !guild.getId().equals(targetPd.getGuildId())) {
+                    sender.sendMessage("§cThat player is not in that guild.");
+                    return true;
+                }
+                GuildRole targetRole = guild.getMembers().get(targetId);
+                if (targetRole == GuildRole.MASTER) {
+                    sender.sendMessage("§cCannot admin-kick the Guild Master. Transfer master first.");
+                    return true;
+                }
+                guild.getMembers().remove(targetId);
+                if (guild.getId().equals(targetPd.getGuildId())) {
+                    targetPd.setGuildId(null);
+                    targetPd.setGuildTitle("");
+                    targetPd.setOutOfAlignmentSinceEpochMs(null);
+                }
+                plugin.storage().save();
+                sender.sendMessage("§aRemoved §f" + safeName(targetId) + " §afrom guild §r" + Text.color(guild.getName()) + "§a.");
+            }
+            return true;
+        }
+
+        if (sub.equals("forcetax")) {
+            if (!sender.hasPermission("magicera.admin")) {
+                sender.sendMessage("§cNo permission.");
+                return true;
+            }
+            plugin.runGuildTaxCycle(sender, true);
+            return true;
+        }
+
         if (sub.equals("disband")) {
             if (!(sender instanceof Player player)) {
                 sender.sendMessage("§cPlayers only.");
@@ -538,18 +851,40 @@ public final class GuildCommand implements TabExecutor {
         if (args.length == 1) {
             List<String> subs = new ArrayList<>(List.of(
                     "help", "menu",
-                    "create", "invite", "accept", "deny", "disband",
+                    "create", "invite", "accept", "leave", "kick", "newmaster", "title",  "deny", "disband",
                     "bank", "deposit", "withdraw", "tax"
             ));
-            if (sender.hasPermission("magicera.admin")) subs.add("reload");
+            if (sender.hasPermission("magicera.admin")) {
+                subs.add("reload");
+                subs.add("add");
+                subs.add("adminadd");
+                subs.add("adminkick");
+                subs.add("forcetax");
+            }
             return filterPrefix(subs, input);
         }
 
         String sub = args[0].toLowerCase();
 
         // /guild invite <player>
-        if (sub.equals("invite") && args.length == 2) {
+        if ((sub.equals("invite") || sub.equals("kick") || sub.equals("newmaster")) && args.length == 2) {
             return filterPrefix(onlinePlayerNames(), input);
+        }
+
+
+        if ((sub.equals("add") || sub.equals("adminadd") || sub.equals("adminkick")) && args.length == 2) {
+            return filterPrefix(onlinePlayerNames(), input);
+        }
+
+        if ((sub.equals("add") || sub.equals("adminadd") || sub.equals("adminkick")) && args.length == 3) {
+            List<String> guildIds = plugin.storage().allGuilds().stream().map(Guild::getId).sorted().collect(Collectors.toList());
+            return filterPrefix(guildIds, input);
+        }
+
+
+        if (sub.equals("kick") && args.length == 3 && sender.hasPermission("magicera.admin")) {
+            List<String> guildIds = plugin.storage().allGuilds().stream().map(Guild::getId).sorted().collect(Collectors.toList());
+            return filterPrefix(guildIds, input);
         }
 
         // /guild create "<name>" <displayName>
@@ -591,6 +926,10 @@ public final class GuildCommand implements TabExecutor {
         sender.sendMessage("§7/guild create \"<name>\" <displayName>");
         sender.sendMessage("§7Example: §f/guild create \"White Rose\" &aWR");
         sender.sendMessage("§7/guild invite <player>");
+        sender.sendMessage("§7/guild kick <player>");
+        sender.sendMessage("§7/guild newmaster <player>");
+        sender.sendMessage("§7/guild leave");
+        sender.sendMessage("§7/guild title <text|clear>");
         sender.sendMessage("§7/guild accept");
         sender.sendMessage("§7/guild deny");
         sender.sendMessage("§7/guild disband");
@@ -598,7 +937,13 @@ public final class GuildCommand implements TabExecutor {
         sender.sendMessage("§7/guild deposit <amount>");
         sender.sendMessage("§7/guild withdraw <amount>");
         sender.sendMessage("§7/guild tax <0-9>");
-        if (sender.hasPermission("magicera.admin")) sender.sendMessage("§7/guild reload");
+        if (sender.hasPermission("magicera.admin")) {
+            sender.sendMessage("§7/guild reload");
+            sender.sendMessage("§7/guild add <player> <guild>");
+            sender.sendMessage("§7/guild adminadd <player> <guild> §8(alias)");
+            sender.sendMessage("§7/guild adminkick <player> <guild>");
+            sender.sendMessage("§7/guild forcetax");
+        }
     }
 
     private static final class ParsedCreate {
@@ -662,6 +1007,28 @@ public final class GuildCommand implements TabExecutor {
     private String stripTrailingQuote(String s) {
         if (s.endsWith("\"") || s.endsWith("'")) return s.substring(0, s.length() - 1);
         return s;
+    }
+
+    private String joinArgs(String[] args, int start) {
+        if (start >= args.length) return "";
+        return String.join(" ", Arrays.copyOfRange(args, start, args.length)).trim();
+    }
+
+    private UUID resolvePlayerUuid(String name) {
+        Player online = Bukkit.getPlayerExact(name);
+        if (online != null) return online.getUniqueId();
+
+        for (OfflinePlayer off : Bukkit.getOfflinePlayers()) {
+            if (off.getName() != null && off.getName().equalsIgnoreCase(name)) {
+                return off.getUniqueId();
+            }
+        }
+        return null;
+    }
+
+    private String safeName(UUID uuid) {
+        String name = Bukkit.getOfflinePlayer(uuid).getName();
+        return name == null ? uuid.toString() : name;
     }
 
     private String fmt(double d) {
