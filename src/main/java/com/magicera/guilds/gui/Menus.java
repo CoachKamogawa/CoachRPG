@@ -31,6 +31,7 @@ public final class Menus {
     public static final String TITLE_RELATION_GUILD = "§8Guild: ";
     public static final String TITLE_LOG = "§8Guild Log";
     public static final String TITLE_FAVOR = "§8Favor";
+    public static final String TITLE_GUILD_LIST = "§8Guilds List";
 
     public static Inventory mainMenu(MagicEraGuildsPlugin plugin, UUID viewer) {
         PlayerData pd = plugin.storage().getOrCreatePlayer(viewer);
@@ -56,8 +57,11 @@ public final class Menus {
             )));
         }
 
+        int minMembers = Math.max(1, plugin.getConfig().getInt("guilds.guild-list-min-members", 3));
         inv.setItem(13, item(Material.MAP, "§bGuilds List", lore(
-                "§7Placeholder for now."
+                "§7Shows guilds with at least §f" + minMembers + "§7 members.",
+                "",
+                "§eClick to open"
         )));
 
         // Favor entry (always accessible)
@@ -83,6 +87,7 @@ public final class Menus {
         inv.setItem(13, item(Material.PLAYER_HEAD, "§bGuild Members", lore("§7View member list.")));
         inv.setItem(14, item(Material.IRON_SWORD, "§bRelations", lore("§7Allies and enemies.")));
         inv.setItem(15, item(Material.WRITABLE_BOOK, "§bGuild Log", lore("§7View guild activity.")));
+        inv.setItem(16, item(Material.BOOK, "§bGuild Info", lore("§7View guild details in chat.")));
 
         inv.setItem(22, item(Material.BOOK, "§f" + Text.color(g.getName()), lore(
                 "§7Name: §r" + Text.color(g.getName()),
@@ -160,9 +165,9 @@ public final class Menus {
             inv.setItem(9 + i, item(icon, "§fLog Entry", lore("§7" + entry)));
         }
 
-        inv.setItem(0, item(Material.RED_STAINED_GLASS_PANE, "§cBack", lore("§7Return")));
-        inv.setItem(7, item(Material.LIME_STAINED_GLASS_PANE, "§aPrev", lore("§7Previous page")));
+        inv.setItem(0, item(Material.LIME_STAINED_GLASS_PANE, "§aPrevious", lore("§7Previous page")));
         inv.setItem(8, item(Material.LIGHT_BLUE_STAINED_GLASS_PANE, "§bNext", lore("§7Next page")));
+        for (int i = 1; i <= 7; i++) inv.setItem(i, backPane());
         return inv;
     }
 
@@ -199,6 +204,44 @@ public final class Menus {
         }
 
         return inv;
+    }
+
+    public static Inventory guildListMenu(MagicEraGuildsPlugin plugin, int page) {
+        Inventory inv = Bukkit.createInventory(null, 54, TITLE_GUILD_LIST + " §7(" + (page + 1) + ")");
+        for (int i = 0; i < 9; i++) inv.setItem(i, backPane());
+        for (int i = 9; i < 54; i++) inv.setItem(i, filler());
+
+        int minMembers = Math.max(1, plugin.getConfig().getInt("guilds.guild-list-min-members", 3));
+        List<Guild> guilds = plugin.storage().allGuilds().stream()
+                .filter(g -> g.getMembers().size() >= minMembers)
+                .sorted(Comparator.comparingInt((Guild g) -> g.getMembers().size()).reversed())
+                .toList();
+
+        int start = page * 45;
+        for (int i = 0; i < 45; i++) {
+            int idx = start + i;
+            if (idx >= guilds.size()) break;
+            Guild g = guilds.get(idx);
+            inv.setItem(9 + i, item(Material.MAP, "§b" + Text.color(g.getName()), lore(
+                    "§7Tag: §7[" + g.getPrefix() + "§7]",
+                    "§7Members: §f" + g.getMembers().size(),
+                    "§7Power: §f" + String.format(Locale.US, "%.2f", guildPower(plugin, g)),
+                    "§7Description: §f" + (g.getDescription().isEmpty() ? "None" : Text.stripColors(g.getDescription()))
+            )));
+        }
+
+        inv.setItem(0, item(Material.LIME_STAINED_GLASS_PANE, "§aPrevious", lore("§7Previous page")));
+        inv.setItem(8, item(Material.LIGHT_BLUE_STAINED_GLASS_PANE, "§bNext", lore("§7Next page")));
+        for (int i = 1; i <= 7; i++) inv.setItem(i, backPane());
+        return inv;
+    }
+
+    private static double guildPower(MagicEraGuildsPlugin plugin, Guild g) {
+        double total = 0.0;
+        for (UUID memberId : g.getMembers().keySet()) {
+            total += plugin.storage().getOrCreatePlayer(memberId).getPower();
+        }
+        return total;
     }
 
     public static Inventory relationGuildMembersMenu(MagicEraGuildsPlugin plugin, Guild g) {
@@ -249,9 +292,9 @@ public final class Menus {
         int headSlot = 22;
         int[] right = new int[]{23, 24, 25, 26};
 
-        // default white with side labels on hover
-        for (int s : left) inv.setItem(s, item(Material.WHITE_STAINED_GLASS_PANE, " ", lore("§c§lSin")));
-        for (int s : right) inv.setItem(s, item(Material.WHITE_STAINED_GLASS_PANE, " ", lore("§a§lHonor")));
+        // default light gray with side labels on hover
+        for (int s : left) inv.setItem(s, item(Material.LIGHT_GRAY_STAINED_GLASS_PANE, " ", lore("§c§lSin")));
+        for (int s : right) inv.setItem(s, item(Material.LIGHT_GRAY_STAINED_GLASS_PANE, " ", lore("§a§lHonor")));
 
         // player head hover shows score + status
         inv.setItem(headSlot, playerHead(viewer, "§bYou", lore(
@@ -324,7 +367,6 @@ public final class Menus {
 
         return item(Material.PAPER, "§bFavor Status", lore(
                 color + favorName,
-                "",
                 color + msg
         ));
     }
