@@ -5,13 +5,15 @@ import java.util.UUID;
 public final class PlayerData {
     private final UUID uuid;
 
-    private String guildId;                 // nullable
-    private int alignmentScore;             // -100..100
+    private String guildId;                  // nullable
+    private int alignmentScore;              // -100..100
     private Long outOfAlignmentSinceEpochMs; // nullable (epoch ms)
 
     // NEW:
-    private String guildTitle;              // nullable / empty ok
-    private long lastSeenEpochMs;           // epoch ms (updated on quit, and on join init)
+    private String guildTitle;               // nullable / empty ok
+    private long lastSeenEpochMs;            // epoch ms (updated on quit, and on join init)
+    private boolean guildChatEnabled;
+    private double power;
 
     public PlayerData(UUID uuid) {
         this.uuid = uuid;
@@ -19,6 +21,8 @@ public final class PlayerData {
         this.outOfAlignmentSinceEpochMs = null;
         this.guildTitle = "";
         this.lastSeenEpochMs = System.currentTimeMillis();
+        this.guildChatEnabled = false;
+        this.power = 15.0;
     }
 
     public UUID getUuid() { return uuid; }
@@ -37,4 +41,10 @@ public final class PlayerData {
 
     public long getLastSeenEpochMs() { return lastSeenEpochMs; }
     public void setLastSeenEpochMs(long lastSeenEpochMs) { this.lastSeenEpochMs = lastSeenEpochMs; }
+
+    public boolean isGuildChatEnabled() { return guildChatEnabled; }
+    public void setGuildChatEnabled(boolean guildChatEnabled) { this.guildChatEnabled = guildChatEnabled; }
+
+    public double getPower() { return power; }
+    public void setPower(double power) { this.power = Math.max(0.0, Math.min(15.0, power)); }
 }
