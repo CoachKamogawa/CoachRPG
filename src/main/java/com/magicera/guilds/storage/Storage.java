@@ -66,6 +66,10 @@ public final class Storage {
                 Guild guild = new Guild(guildId, name, prefix, alignment);
                 guild.setTitle(title);
 
+                // NEW: description + founded timestamp
+                guild.setDescription(s.getString("description", ""));
+                guild.setFoundedAtEpochMs(s.getLong("foundedAtEpochMs", System.currentTimeMillis()));
+
                 // Bank + tax + officer withdraw window tracking
                 guild.setBankBalance(s.getDouble("bankBalance", 0.0));
                 guild.setTaxPercent(s.getInt("taxPercent", 0));
@@ -150,6 +154,9 @@ public final class Storage {
                     pd.setGuildChatEnabled(pSec.getBoolean(uuidStr + ".guildChatEnabled", false));
                     pd.setPower(pSec.getDouble(uuidStr + ".power", 15.0));
 
+                    // NEW: offline tax notice accumulator
+                    pd.setPendingTaxNoticeAmount(pSec.getDouble(uuidStr + ".pendingTaxNoticeAmount", 0.0));
+
                     playersById.put(uuid, pd);
                 } catch (IllegalArgumentException ignored) {
                 }
@@ -170,6 +177,11 @@ public final class Storage {
             guildsYaml.set(base + ".name", g.getName());
             guildsYaml.set(base + ".prefix", g.getPrefix());
             guildsYaml.set(base + ".title", g.getTitle());
+
+            // NEW: description + founded timestamp
+            guildsYaml.set(base + ".description", g.getDescription());
+            guildsYaml.set(base + ".foundedAtEpochMs", g.getFoundedAtEpochMs());
+
             guildsYaml.set(base + ".alignment", g.getAlignment().name());
 
             // Bank + tax + officer withdraw window tracking
@@ -230,6 +242,9 @@ public final class Storage {
             playersYaml.set(base + ".lastSeenEpochMs", p.getLastSeenEpochMs());
             playersYaml.set(base + ".guildChatEnabled", p.isGuildChatEnabled());
             playersYaml.set(base + ".power", p.getPower());
+
+            // NEW: offline tax notice accumulator
+            playersYaml.set(base + ".pendingTaxNoticeAmount", p.getPendingTaxNoticeAmount());
         }
 
         try {
@@ -278,6 +293,10 @@ public final class Storage {
 
         Guild g = new Guild(id, name, prefix, GuildAlignment.NEUTRAL);
         g.setRole(masterUuid, GuildRole.MASTER);
+
+        // NEW: initialize these on creation
+        g.setDescription("");
+        g.setFoundedAtEpochMs(System.currentTimeMillis());
 
         guildsById.put(id, g);
 
