@@ -8,6 +8,8 @@ public final class Guild {
     private String name;   // colored
     private String prefix; // colored
     private String title;  // colored
+    private String description;
+    private long foundedAtEpochMs;
     private GuildAlignment alignment;
 
     private final Map<UUID, GuildRole> members = new HashMap<>();
@@ -16,7 +18,7 @@ public final class Guild {
 
     // Bank + tax + officer withdraw window tracking
     private double bankBalance;
-    private int taxPercent; // 0..9
+    private int taxPercent; // 0..5
     private double officerWithdrawUsed24h;
     private long officerWithdrawWindowStartMs;
 
@@ -45,6 +47,8 @@ public final class Guild {
         this.name = name;
         this.prefix = prefix;
         this.title = "";
+        this.description = "";
+        this.foundedAtEpochMs = System.currentTimeMillis();
         this.alignment = alignment;
 
         this.bankBalance = 0.0;
@@ -77,6 +81,14 @@ public final class Guild {
     public String getTitle() { return title == null ? "" : title; }
     public void setTitle(String title) { this.title = title; }
 
+    public String getDescription() { return description == null ? "" : description; }
+    public void setDescription(String description) { this.description = description == null ? "" : description; }
+
+    public long getFoundedAtEpochMs() { return foundedAtEpochMs; }
+    public void setFoundedAtEpochMs(long foundedAtEpochMs) {
+        this.foundedAtEpochMs = Math.max(0L, foundedAtEpochMs);
+    }
+
     public GuildAlignment getAlignment() { return alignment; }
     public void setAlignment(GuildAlignment alignment) { this.alignment = alignment; }
 
@@ -97,25 +109,39 @@ public final class Guild {
     }
 
     public double getBankBalance() { return bankBalance; }
-    public void setBankBalance(double bankBalance) { this.bankBalance = Math.max(0.0, bankBalance); }
+    public void setBankBalance(double bankBalance) {
+        this.bankBalance = Math.max(0.0, bankBalance);
+    }
 
     public int getTaxPercent() { return taxPercent; }
-    public void setTaxPercent(int taxPercent) { this.taxPercent = Math.max(0, Math.min(9, taxPercent)); }
+    public void setTaxPercent(int taxPercent) {
+        this.taxPercent = Math.max(0, Math.min(5, taxPercent));
+    }
 
     public double getOfficerWithdrawUsed24h() { return officerWithdrawUsed24h; }
-    public void setOfficerWithdrawUsed24h(double v) { this.officerWithdrawUsed24h = Math.max(0.0, v); }
+    public void setOfficerWithdrawUsed24h(double v) {
+        this.officerWithdrawUsed24h = Math.max(0.0, v);
+    }
 
     public long getOfficerWithdrawWindowStartMs() { return officerWithdrawWindowStartMs; }
-    public void setOfficerWithdrawWindowStartMs(long ms) { this.officerWithdrawWindowStartMs = Math.max(0L, ms); }
+    public void setOfficerWithdrawWindowStartMs(long ms) {
+        this.officerWithdrawWindowStartMs = Math.max(0L, ms);
+    }
 
     public Long getMasterOutOfFavorSinceEpochMs() { return masterOutOfFavorSinceEpochMs; }
-    public void setMasterOutOfFavorSinceEpochMs(Long ms) { this.masterOutOfFavorSinceEpochMs = ms; }
+    public void setMasterOutOfFavorSinceEpochMs(Long ms) {
+        this.masterOutOfFavorSinceEpochMs = ms;
+    }
 
     public Long getImpeachmentStartedEpochMs() { return impeachmentStartedEpochMs; }
-    public void setImpeachmentStartedEpochMs(Long ms) { this.impeachmentStartedEpochMs = ms; }
+    public void setImpeachmentStartedEpochMs(Long ms) {
+        this.impeachmentStartedEpochMs = ms;
+    }
 
     public long getKickLockUntilEpochMs() { return kickLockUntilEpochMs; }
-    public void setKickLockUntilEpochMs(long ms) { this.kickLockUntilEpochMs = Math.max(0L, ms); }
+    public void setKickLockUntilEpochMs(long ms) {
+        this.kickLockUntilEpochMs = Math.max(0L, ms);
+    }
 
     public Map<UUID, Boolean> getImpeachmentVotes() { return impeachmentVotes; }
 
@@ -136,13 +162,17 @@ public final class Guild {
     }
 
     public boolean isMembersCanClaim() { return membersCanClaim; }
-    public void setMembersCanClaim(boolean membersCanClaim) { this.membersCanClaim = membersCanClaim; }
+    public void setMembersCanClaim(boolean membersCanClaim) {
+        this.membersCanClaim = membersCanClaim;
+    }
 
     public boolean isInWar() { return inWar; }
     public void setInWar(boolean inWar) { this.inWar = inWar; }
 
     public Long getWarEndsAtEpochMs() { return warEndsAtEpochMs; }
-    public void setWarEndsAtEpochMs(Long warEndsAtEpochMs) { this.warEndsAtEpochMs = warEndsAtEpochMs; }
+    public void setWarEndsAtEpochMs(Long warEndsAtEpochMs) {
+        this.warEndsAtEpochMs = warEndsAtEpochMs;
+    }
 
     public Set<String> getClaimedChunks() { return claimedChunks; }
     public Set<String> getAllies() { return allies; }
