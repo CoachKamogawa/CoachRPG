@@ -71,6 +71,20 @@ public final class GuildMaintenanceTask implements Runnable {
             }
 
             processImpeachment(guild, now);
+
+            if (guild.isInWar() && guild.getWarEndsAtEpochMs() != null && now >= guild.getWarEndsAtEpochMs()) {
+                guild.setInWar(false);
+                guild.setWarEndsAtEpochMs(null);
+                guild.addLogEntry("War ended.");
+            }
+
+            if (!guild.isInWar()) {
+                double regenPerMinute = 3.333 / 60.0;
+                for (UUID memberId : guild.getMembers().keySet()) {
+                    PlayerData memberPd = plugin.storage().getOrCreatePlayer(memberId);
+                    memberPd.setPower(memberPd.getPower() + regenPerMinute);
+                }
+            }
         }
 
         for (String guildId : toDelete) {
