@@ -17,9 +17,13 @@ import org.bukkit.event.block.BlockPlaceEvent;
 import org.bukkit.event.entity.EntityCombustByEntityEvent;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
+import org.bukkit.event.player.PlayerMoveEvent;
 import org.bukkit.inventory.InventoryHolder;
 
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 
 public final class GuildProtectionListener implements Listener {
 
@@ -31,6 +35,9 @@ public final class GuildProtectionListener implements Listener {
     );
 
     private final MagicEraGuildsPlugin plugin;
+
+    // Tracks the last claim shown per player (by guild id); avoids spamming titles.
+    private final Map<UUID, String> lastShownClaim = new HashMap<>();
 
     public GuildProtectionListener(MagicEraGuildsPlugin plugin) {
         this.plugin = plugin;
@@ -98,6 +105,29 @@ public final class GuildProtectionListener implements Listener {
             event.setCancelled(true);
             event.setCastCancelled(true);
         }
+    }
+
+    @EventHandler(ignoreCancelled = true)
+    public void onMove(PlayerMoveEvent event) {
+        if (event.getTo() == null) return;
+        if (event.getFrom().getChunk().equals(event.getTo().getChunk())) return;
+
+        Player player = event.getPlayer();
+
+        Guild owner = ownerOf(event.getTo().getBlock());
+        String ownerId = owner == null ? "" : owner.getId();
+
+        String prev = lastShownClaim.getOrDefault(player.getUniqueId(), "");
+        if (prev.equals(ownerId)) return;
+
+        lastShownClaim.put(player.getUniqueId(), ownerId);
+        if (owner == null) return;
+
+        String sub = owner.getDescription().isEmpty()
+                ? "§7No description set."
+                : "§7" + owner.getDescription();
+
+        player.sendTitle("§f[" + owner.getName() + "§f]", sub, 5, 50, 10);
     }
 
     private boolean canBuild(Player player, Block block) {
