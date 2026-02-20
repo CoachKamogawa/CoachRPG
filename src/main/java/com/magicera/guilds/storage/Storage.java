@@ -66,11 +66,25 @@ public final class Storage {
                 Guild guild = new Guild(guildId, name, prefix, alignment);
                 guild.setTitle(title);
 
-                // NEW fields
+                // Bank + tax + officer withdraw window tracking
                 guild.setBankBalance(s.getDouble("bankBalance", 0.0));
                 guild.setTaxPercent(s.getInt("taxPercent", 0));
                 guild.setOfficerWithdrawUsed24h(s.getDouble("officerWithdrawUsed24h", 0.0));
                 guild.setOfficerWithdrawWindowStartMs(s.getLong("officerWithdrawWindowStartMs", 0L));
+
+                // Favor / impeachment / log fields
+                long masterSince = s.getLong("masterOutOfFavorSinceEpochMs", 0L);
+                guild.setMasterOutOfFavorSinceEpochMs(masterSince == 0L ? null : masterSince);
+
+                long impSince = s.getLong("impeachmentStartedEpochMs", 0L);
+                guild.setImpeachmentStartedEpochMs(impSince == 0L ? null : impSince);
+
+                guild.setKickLockUntilEpochMs(s.getLong("kickLockUntilEpochMs", 0L));
+
+                List<String> logs = s.getStringList("logEntries");
+                if (logs != null && !logs.isEmpty()) {
+                    guild.getLogEntries().addAll(logs);
+                }
 
                 ConfigurationSection mem = s.getConfigurationSection("members");
                 if (mem != null) {
@@ -85,6 +99,15 @@ public final class Storage {
                                 role = GuildRole.MEMBER;
                             }
                             guild.setRole(uuid, role);
+
+                            long joinedAt = s.getLong("memberJoinedAt." + uuidStr, 0L);
+                            if (joinedAt > 0L) {
+                                guild.getMemberJoinedAt().put(uuid, joinedAt);
+                            }
+
+                            if (s.contains("impeachmentVotes." + uuidStr)) {
+                                guild.getImpeachmentVotes().put(uuid, s.getBoolean("impeachmentVotes." + uuidStr));
+                            }
                         } catch (IllegalArgumentException ignored3) {
                         }
                     }
@@ -133,16 +156,36 @@ public final class Storage {
             guildsYaml.set(base + ".title", g.getTitle());
             guildsYaml.set(base + ".alignment", g.getAlignment().name());
 
-            // NEW fields
+            // Bank + tax + officer withdraw window tracking
             guildsYaml.set(base + ".bankBalance", g.getBankBalance());
             guildsYaml.set(base + ".taxPercent", g.getTaxPercent());
             guildsYaml.set(base + ".officerWithdrawUsed24h", g.getOfficerWithdrawUsed24h());
             guildsYaml.set(base + ".officerWithdrawWindowStartMs", g.getOfficerWithdrawWindowStartMs());
 
+            // Favor / impeachment / log fields
+            guildsYaml.set(base + ".masterOutOfFavorSinceEpochMs",
+                    g.getMasterOutOfFavorSinceEpochMs() == null ? 0L : g.getMasterOutOfFavorSinceEpochMs());
+            guildsYaml.set(base + ".impeachmentStartedEpochMs",
+                    g.getImpeachmentStartedEpochMs() == null ? 0L : g.getImpeachmentStartedEpochMs());
+            guildsYaml.set(base + ".kickLockUntilEpochMs", g.getKickLockUntilEpochMs());
+            guildsYaml.set(base + ".logEntries", g.getLogEntries());
+
             String memBase = base + ".members";
             guildsYaml.set(memBase, null);
             for (Map.Entry<UUID, GuildRole> e : g.getMembers().entrySet()) {
                 guildsYaml.set(memBase + "." + e.getKey(), e.getValue().name());
+            }
+
+            String joinedBase = base + ".memberJoinedAt";
+            guildsYaml.set(joinedBase, null);
+            for (Map.Entry<UUID, Long> e : g.getMemberJoinedAt().entrySet()) {
+                guildsYaml.set(joinedBase + "." + e.getKey(), e.getValue());
+            }
+
+            String votesBase = base + ".impeachmentVotes";
+            guildsYaml.set(votesBase, null);
+            for (Map.Entry<UUID, Boolean> e : g.getImpeachmentVotes().entrySet()) {
+                guildsYaml.set(votesBase + "." + e.getKey(), e.getValue());
             }
         }
 
