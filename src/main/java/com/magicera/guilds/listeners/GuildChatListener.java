@@ -27,8 +27,9 @@ public final class GuildChatListener implements Listener {
         Guild guild = plugin.storage().getGuild(pd.getGuildId());
         if (guild == null) return;
 
-        String title = guild.getTitle().isEmpty() ? guild.getName() : guild.getTitle();
-        String tag = "§8[§r" + Text.color(title) + "§8]§r ";
-        event.setFormat(tag + "%1$s§7: §f%2$s");
+        String memberTitle = pd.getGuildTitle();
+        String titlePart = memberTitle.isEmpty() ? "" : "§8[§r" + Text.color(memberTitle) + "§8]§r ";
+        String guildPart = "§8[" + guild.getPrefix() + "§8]§r ";
+        event.setFormat(guildPart + titlePart + "%1$s§7: §f%2$s");
     }
 }
