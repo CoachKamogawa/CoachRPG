@@ -789,4 +789,3 @@ public final class GuildCommand implements CommandExecutor {
         }
     }
 }
-::contentReference[oaicite:0]{index=0}
