@@ -1,15 +1,16 @@
-name: CoachRPG
+name: MagicEraGuilds
 main: com.magicera.guilds.MagicEraGuildsPlugin
 version: 1.0.0
-api-version: "1.21"
+api-version: 1.21
+author: Coach Kamogawa
 
 commands:
   guild:
     description: Guild commands
     usage: /guild
-  align:
-    description: Open the alignment menu
-    usage: /align
+  favor:
+    description: Favor
+    usage: /favor 
 
 permissions:
   magicera.admin:
@@ -27,9 +28,9 @@ permissions:
     usage: /duel
     permission: magicera.duel.use
 
-  alignment:
-    description: Alignment admin command
-    usage: /alignment <get|set|add> <player> [amount]
+  favor:
+    description: Favor admin command
+    usage: /favor <get|set|add> <player> [amount]
     permission: magicera.admin
 
 permissions:
