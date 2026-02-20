@@ -15,6 +15,9 @@ dependencies {
 
     // Local Vault jar for compile
     compileOnly(files("libs/Vault.jar"))
+
+    // Local MagicSpells jar for compile
+    compileOnly(files("libs/MagicSpells-4.0-Beta-17.jar"))
 }
 
 java {
