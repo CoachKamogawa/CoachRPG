@@ -1,6 +1,5 @@
 package com.magicera.guilds.commands;
 
-import com.magicera.guilds.MagicEraGuildsPlugin;
 import com.magicera.guilds.data.Guild;
 import com.magicera.guilds.data.GuildAlignment;
 import com.magicera.guilds.data.GuildRole;
