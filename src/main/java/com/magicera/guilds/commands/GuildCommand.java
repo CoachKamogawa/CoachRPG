@@ -87,6 +87,8 @@ public final class GuildCommand implements CommandExecutor {
 
             sender.sendMessage("§7Guild bank balance: §a$" + fmt(g.getBankBalance()));
             sender.sendMessage("§7Guild tax: §e" + g.getTaxPercent() + "%");
+            sender.sendMessage("§7Guild type: §f" + AlignmentUtil.guildTypeName(g.getAlignment()));
+            sender.sendMessage("§7Guild favor: §f" + AlignmentUtil.displayName(g.getAlignment()));
             return true;
         }
 
@@ -340,7 +342,10 @@ public final class GuildCommand implements CommandExecutor {
 
             plugin.storage().save();
 
-            sender.sendMessage("§aCreated guild: §r" + g.getName() + " §7[" + g.getPrefix() + "§7] §7Alignment: §f" + masterAlign.name());
+            sender.sendMessage("§aCreated guild: §r" + Text.color(g.getName())
+                    + " §7[" + g.getPrefix() + "§7]"
+                    + " §7Type: §f" + AlignmentUtil.guildTypeName(masterAlign)
+                    + " §7Favor: §f" + AlignmentUtil.displayName(masterAlign));
             return true;
         }
 
@@ -394,15 +399,19 @@ public final class GuildCommand implements CommandExecutor {
             GuildAlignment guildAlign = guild.getAlignment();
             GuildAlignment targetAlign = AlignmentUtil.groupFromScore(targetData.getAlignmentScore());
 
+            // Only same Favor can join; Neutral (Balance) can be snapped when they accept
             if (targetAlign != GuildAlignment.NEUTRAL && targetAlign != guildAlign) {
-                sender.sendMessage("§cThat player is out of alignment and cannot join this guild.");
+                sender.sendMessage("§cThat player is out of Favor and cannot join this guild.");
                 return true;
             }
 
             plugin.inviteManager().setInvite(target.getUniqueId(), guild.getId(), inviter.getUniqueId());
 
-            sender.sendMessage("§aInvited §f" + target.getName() + " §ato §r" + guild.getName() + " §7[" + guild.getPrefix() + "§7]");
-            target.sendMessage("§7[§bMagicEra§7] §fYou were invited to join §r" + guild.getName() + " §7[" + guild.getPrefix() + "§7]");
+            sender.sendMessage("§aInvited §f" + target.getName() + " §ato §r" + Text.color(guild.getName())
+                    + " §7[" + guild.getPrefix() + "§7]");
+
+            target.sendMessage("§7[§bMagicEra§7] §fYou were invited to join §r" + Text.color(guild.getName())
+                    + " §7[" + guild.getPrefix() + "§7]");
             target.sendMessage("§7Type §a/guild accept §7or §c/guild deny");
             return true;
         }
@@ -444,6 +453,7 @@ public final class GuildCommand implements CommandExecutor {
             GuildAlignment guildAlign = guild.getAlignment();
             GuildAlignment playerAlign = AlignmentUtil.groupFromScore(pd.getAlignmentScore());
 
+            // Snap Balance -> guild on accept (if guild isn't Balance)
             if (playerAlign == GuildAlignment.NEUTRAL && guildAlign != GuildAlignment.NEUTRAL) {
                 int snapped = AlignmentUtil.snapScoreToGuild(guildAlign);
                 pd.setAlignmentScore(snapped);
@@ -452,7 +462,7 @@ public final class GuildCommand implements CommandExecutor {
 
             if (playerAlign != guildAlign) {
                 plugin.inviteManager().clearInvite(player);
-                sender.sendMessage("§cYou are out of alignment and cannot join this guild.");
+                sender.sendMessage("§cYou are out of Favor and cannot join this guild.");
                 return true;
             }
 
@@ -463,7 +473,7 @@ public final class GuildCommand implements CommandExecutor {
             plugin.inviteManager().clearInvite(player);
             plugin.storage().save();
 
-            sender.sendMessage("§aYou joined §r" + guild.getName() + " §7[" + guild.getPrefix() + "§7]");
+            sender.sendMessage("§aYou joined §r" + Text.color(guild.getName()) + " §7[" + guild.getPrefix() + "§7]");
 
             Bukkit.broadcastMessage("§b[Magic Era] §f" + player.getName() + " has joined " + Text.color(guild.getName()) + "§f.");
 
@@ -511,7 +521,7 @@ public final class GuildCommand implements CommandExecutor {
             plugin.storage().deleteGuild(g.getId());
             plugin.storage().save();
 
-            Bukkit.broadcastMessage("§7[§bMagicEra§7] §cGuild disbanded: §r" + g.getName());
+            Bukkit.broadcastMessage("§7[§bMagicEra§7] §cGuild disbanded: §r" + Text.color(g.getName()));
             return true;
         }
 
@@ -533,6 +543,7 @@ public final class GuildCommand implements CommandExecutor {
         sender.sendMessage("§7/guild withdraw <amount>");
         sender.sendMessage("§7/guild tax <0-9>");
         sender.sendMessage("§7/guild reload");
+        sender.sendMessage("§7/favor §8(open Favor menu)");
     }
 
     // ----- helpers -----
