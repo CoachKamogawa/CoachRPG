@@ -4,6 +4,7 @@ import com.magicera.guilds.MagicEraGuildsPlugin;
 import com.magicera.guilds.data.Guild;
 import com.magicera.guilds.data.PlayerData;
 import com.magicera.guilds.util.Text;
+import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
@@ -22,14 +23,24 @@ public final class GuildChatListener implements Listener {
     public void onChat(AsyncPlayerChatEvent event) {
         Player player = event.getPlayer();
         PlayerData pd = plugin.storage().getOrCreatePlayer(player.getUniqueId());
-        if (pd.getGuildId() == null) return;
+
+        if (!pd.isGuildChatEnabled() || pd.getGuildId() == null) return;
 
         Guild guild = plugin.storage().getGuild(pd.getGuildId());
         if (guild == null) return;
 
+        event.setCancelled(true);
+
         String memberTitle = pd.getGuildTitle();
         String titlePart = memberTitle.isEmpty() ? "" : "§8[§r" + Text.color(memberTitle) + "§8]§r ";
-        String guildPart = "§8[" + guild.getPrefix() + "§8]§r ";
-        event.setFormat(guildPart + titlePart + "%1$s§7: §f%2$s");
+        String guildPart = "§8[§dGuild§8] §8[" + guild.getPrefix() + "§8]§r ";
+        String msg = guildPart + titlePart + player.getName() + "§7: §f" + event.getMessage();
+
+        for (Player online : Bukkit.getOnlinePlayers()) {
+            PlayerData target = plugin.storage().getOrCreatePlayer(online.getUniqueId());
+            if (guild.getId().equals(target.getGuildId())) {
+                online.sendMessage(msg);
+            }
+        }
     }
 }
