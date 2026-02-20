@@ -13,6 +13,7 @@ import com.magicera.guilds.guilds.VaultManager;
 import com.magicera.guilds.listeners.PlayerSeenListener;
 import com.magicera.guilds.storage.Storage;
 import org.bukkit.Bukkit;
+import org.bukkit.plugin.PluginCommand;
 import org.bukkit.plugin.java.JavaPlugin;
 
 public final class MagicEraGuildsPlugin extends JavaPlugin {
@@ -45,12 +46,12 @@ public final class MagicEraGuildsPlugin extends JavaPlugin {
             boolean econOk = economyHook.setup();
 
             // -------------------------
-            // Commands
+            // Commands (with tab-complete)
             // -------------------------
-            if (getCommand("guild") != null) getCommand("guild").setExecutor(new GuildCommand(this));
-            if (getCommand("party") != null) getCommand("party").setExecutor(new PartyCommand(this));
-            if (getCommand("duel") != null) getCommand("duel").setExecutor(new DuelCommand(this));
-            if (getCommand("favor") != null) getCommand("favor").setExecutor(new FavorCommand(this));
+            registerCommand("guild", new GuildCommand(this));
+            registerCommand("party", new PartyCommand(this));
+            registerCommand("duel", new DuelCommand(this));
+            registerCommand("favor", new FavorCommand(this));
 
             // -------------------------
             // Listeners
@@ -58,7 +59,7 @@ public final class MagicEraGuildsPlugin extends JavaPlugin {
             Bukkit.getPluginManager().registerEvents(new MenuListener(this), this);
             Bukkit.getPluginManager().registerEvents(new PlayerSeenListener(this), this);
 
-            // Alignment watcher (still used for out-of-alignment warnings; names are handled in util)
+            // Alignment watcher (still used for out-of-alignment warnings; names handled elsewhere)
             alignmentWatcher = new AlignmentWatcher(this);
             Bukkit.getPluginManager().registerEvents(new JoinListener(alignmentWatcher), this);
 
@@ -102,5 +103,18 @@ public final class MagicEraGuildsPlugin extends JavaPlugin {
             try { storage.save(); } catch (Exception ignored) {}
         }
         getLogger().info("MagicEraGuilds disabled.");
+    }
+
+    /**
+     * Registers executor + tab completer (works with TabExecutor).
+     */
+    private void registerCommand(String name, org.bukkit.command.TabExecutor executor) {
+        PluginCommand cmd = getCommand(name);
+        if (cmd == null) {
+            getLogger().warning("Command '/" + name + "' is missing from plugin.yml (not registered).");
+            return;
+        }
+        cmd.setExecutor(executor);
+        cmd.setTabCompleter(executor);
     }
 }
