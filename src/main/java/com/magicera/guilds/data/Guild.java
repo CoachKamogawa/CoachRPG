@@ -9,6 +9,7 @@ public final class Guild {
     private final String id;
     private String name;   // colored
     private String prefix; // colored
+    private String title;  // colored
     private GuildAlignment alignment;
 
     private final Map<UUID, GuildRole> members = new HashMap<>();
@@ -23,6 +24,7 @@ public final class Guild {
         this.id = id;
         this.name = name;
         this.prefix = prefix;
+        this.title = "";
         this.alignment = alignment;
 
         this.bankBalance = 0.0;
@@ -38,6 +40,9 @@ public final class Guild {
 
     public String getPrefix() { return prefix; }
     public void setPrefix(String prefix) { this.prefix = prefix; }
+
+    public String getTitle() { return title == null ? "" : title; }
+    public void setTitle(String title) { this.title = title; }
 
     public GuildAlignment getAlignment() { return alignment; }
     public void setAlignment(GuildAlignment alignment) { this.alignment = alignment; }
