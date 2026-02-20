@@ -14,6 +14,7 @@ public final class PlayerData {
     private long lastSeenEpochMs;            // epoch ms (updated on quit, and on join init)
     private boolean guildChatEnabled;
     private double power;
+    private double pendingTaxNoticeAmount;
 
     public PlayerData(UUID uuid) {
         this.uuid = uuid;
@@ -23,6 +24,7 @@ public final class PlayerData {
         this.lastSeenEpochMs = System.currentTimeMillis();
         this.guildChatEnabled = false;
         this.power = 15.0;
+        this.pendingTaxNoticeAmount = 0.0;
     }
 
     public UUID getUuid() { return uuid; }
@@ -47,4 +49,9 @@ public final class PlayerData {
 
     public double getPower() { return power; }
     public void setPower(double power) { this.power = Math.max(0.0, Math.min(15.0, power)); }
+
+    public double getPendingTaxNoticeAmount() { return pendingTaxNoticeAmount; }
+    public void setPendingTaxNoticeAmount(double pendingTaxNoticeAmount) {
+        this.pendingTaxNoticeAmount = Math.max(0.0, pendingTaxNoticeAmount);
+    }
 }
