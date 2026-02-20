@@ -1,10 +1,10 @@
-# Foundation config (we'll expand later)
 data:
   save-interval-seconds: 120
 
 guilds:
   inactivity-autodisbands-days: 30
   impeach-min-members: 10
+  guild-list-min-members: 3
 
 claims:
   leader-start-chunks: 4
