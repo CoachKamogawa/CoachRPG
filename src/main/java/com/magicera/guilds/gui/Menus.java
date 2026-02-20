@@ -4,6 +4,7 @@ import com.magicera.guilds.MagicEraGuildsPlugin;
 import com.magicera.guilds.data.Guild;
 import com.magicera.guilds.data.GuildRole;
 import com.magicera.guilds.data.PlayerData;
+import com.magicera.guilds.util.AlignmentUtil;
 import com.magicera.guilds.util.Text;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
@@ -29,7 +30,7 @@ public final class Menus {
     public static final String TITLE_VAULT = "§8Guild Vault";
     public static final String TITLE_MEMBERS = "§8Guild Members";
     public static final String TITLE_RELATIONS = "§8Relations";
-    public static final String TITLE_ALIGNMENT = "§8Alignment";
+    public static final String TITLE_FAVOR = "§8Favor";
 
     public static Inventory mainMenu(MagicEraGuildsPlugin plugin, UUID viewer) {
         PlayerData pd = plugin.storage().getOrCreatePlayer(viewer);
@@ -42,7 +43,7 @@ public final class Menus {
             inv.setItem(11, item(Material.BOOK, "§bYour Guild", lore(
                     "§7Name: §r" + Text.color(g.getName()),
                     "§7Tag: §7[" + g.getPrefix() + "§7]",
-                    "§7Alignment: §f" + g.getAlignment().name(),
+                    "§7Type: §f" + AlignmentUtil.guildTypeName(g.getAlignment()),
                     "",
                     "§eClick to open"
             )));
@@ -57,10 +58,10 @@ public final class Menus {
                 "§7Placeholder for now."
         )));
 
-        // Alignment always accessible
+        // Favor always accessible
         int score = pd.getAlignmentScore();
-        inv.setItem(15, item(Material.NETHER_STAR, "§bAlignment", lore(
-                "§7Your Alignment Score: §f" + score,
+        inv.setItem(15, item(Material.NETHER_STAR, "§bFavor", lore(
+                "§7Your Favor Score: §f" + score,
                 "",
                 "§eClick to open"
         )));
@@ -80,7 +81,8 @@ public final class Menus {
 
         inv.setItem(22, item(Material.BOOK, "§f" + Text.color(g.getName()), lore(
                 "§7Tag: §7[" + g.getPrefix() + "§7]",
-                "§7Alignment: §f" + g.getAlignment().name()
+                "§7Type: §f" + AlignmentUtil.guildTypeName(g.getAlignment()),
+                "§7Favor: §f" + AlignmentUtil.displayName(g.getAlignment())
         )));
 
         return inv;
@@ -150,57 +152,47 @@ public final class Menus {
     }
 
     /**
-     * Alignment Menu: always available (guild not required)
-     * Center head + 5 "pips" per side.
-     *
-     * Visual note: Minecraft rows are 9 wide, so we represent 5-per-side
-     * as 4 on the center row + 1 just below on each side.
+     * Favor Menu: always available (guild not required)
+     * Center head + 5 pips per side.
+     * Left = Sin (red). Right = Honor (green). Neutral = white.
      */
-    public static Inventory alignmentMenu(MagicEraGuildsPlugin plugin, UUID viewer) {
+    public static Inventory favorMenu(MagicEraGuildsPlugin plugin, UUID viewer) {
         PlayerData pd = plugin.storage().getOrCreatePlayer(viewer);
-        int score = pd.getAlignmentScore(); // -100..100
+        int score = pd.getAlignmentScore();
 
-        Inventory inv = Bukkit.createInventory(null, 27, TITLE_ALIGNMENT);
+        Inventory inv = Bukkit.createInventory(null, 27, TITLE_FAVOR);
 
-        // top bar: go back
         for (int i = 0; i < 9; i++) inv.setItem(i, backPane());
         for (int i = 9; i < 27; i++) inv.setItem(i, filler());
 
-        // center player head
         inv.setItem(13, playerHead(Bukkit.getOfflinePlayer(viewer), score));
 
-        // 5 pips each side (4 in row, 1 below)
-        int[] leftSlots = { 12, 11, 10, 9, 21 };   // dark side
-        int[] rightSlots = { 14, 15, 16, 17, 23 }; // honorable side
+        int honorPips = calcPositivePips(score);
+        int sinPips = calcNegativePips(score);
 
-        int redCount = calcNegativePips(score);
-        int greenCount = calcPositivePips(score);
+        int[] leftSlots = {12, 11, 10, 9, 21};     // Sin
+        int[] rightSlots = {14, 15, 16, 17, 23};   // Honor
 
         for (int i = 0; i < leftSlots.length; i++) {
-            boolean filled = i < redCount;
-            inv.setItem(leftSlots[i], item(
-                    filled ? Material.RED_STAINED_GLASS_PANE : Material.WHITE_STAINED_GLASS_PANE,
-                    filled ? "§cDark" : "§f",
-                    null
-            ));
+            boolean filled = i < sinPips;
+            inv.setItem(leftSlots[i],
+                    item(filled ? Material.RED_STAINED_GLASS_PANE : Material.WHITE_STAINED_GLASS_PANE,
+                            filled ? "§cSin" : "§f", null));
         }
 
         for (int i = 0; i < rightSlots.length; i++) {
-            boolean filled = i < greenCount;
-            inv.setItem(rightSlots[i], item(
-                    filled ? Material.LIME_STAINED_GLASS_PANE : Material.WHITE_STAINED_GLASS_PANE,
-                    filled ? "§aHonorable" : "§f",
-                    null
-            ));
+            boolean filled = i < honorPips;
+            inv.setItem(rightSlots[i],
+                    item(filled ? Material.LIME_STAINED_GLASS_PANE : Material.WHITE_STAINED_GLASS_PANE,
+                            filled ? "§aHonor" : "§f", null));
         }
 
-        // info card
-        inv.setItem(22, item(Material.PAPER, "§bAlignment Info", lore(
+        inv.setItem(22, item(Material.PAPER, "§bFavor Status", lore(
                 "§7Score: §f" + score,
                 "",
-                "§7-100 to -50 = §cDark",
-                "§7-49 to 49 = §7Neutral",
-                "§750 to 100 = §aHonorable"
+                score >= 50 ? "§aHonor"
+                        : score <= -50 ? "§cSin"
+                        : "§7Balance"
         )));
 
         return inv;
@@ -209,7 +201,7 @@ public final class Menus {
     private static int calcPositivePips(int score) {
         if (score <= 0) return 0;
         if (score >= 100) return 5;
-        return (int) Math.ceil(score / 20.0); // 1-20=1 ... 81-100=5
+        return (int) Math.ceil(score / 20.0);
     }
 
     private static int calcNegativePips(int score) {
@@ -223,9 +215,9 @@ public final class Menus {
         ItemMeta meta = head.getItemMeta();
         if (meta instanceof SkullMeta sm) {
             sm.setOwningPlayer(player);
-            sm.setDisplayName("§bYour Alignment");
+            sm.setDisplayName("§bYour Favor");
 
-            String group = score >= 50 ? "§aHonorable" : (score <= -50 ? "§cDark" : "§7Neutral");
+            String group = score >= 50 ? "§aHonor" : (score <= -50 ? "§cSin" : "§7Balance");
 
             sm.setLore(lore(
                     "§7Score: §f" + score,
