@@ -67,7 +67,8 @@ public final class FavorCommand implements CommandExecutor {
             plugin.storage().save();
 
             sender.sendMessage("§aSet §f" + target.getName() + "§a Favor to §f" + score + "§a.");
-            target.sendMessage("§b[Magic Era] §fYour Favor is now §f" + score + "§f.");
+            target.sendMessage("§7[§bMagic Era§7] §fYour Favor is now §f" + score + "§f.");
+            if (plugin.alignmentWatcher() != null) plugin.alignmentWatcher().checkAndWarn(target, false);
             return true;
         }
 
@@ -98,7 +99,8 @@ public final class FavorCommand implements CommandExecutor {
             plugin.storage().save();
 
             sender.sendMessage("§aAdded §f" + add + "§a Favor to §f" + target.getName() + "§a. New: §f" + newScore);
-            target.sendMessage("§b[Magic Era] §fYour Favor changed by §f" + add + "§f. New: §f" + newScore);
+            target.sendMessage("§7[§bMagic Era§7] §fYour Favor changed by §f" + add + "§f. New: §f" + newScore);
+            if (plugin.alignmentWatcher() != null) plugin.alignmentWatcher().checkAndWarn(target, false);
             return true;
         }
 
