@@ -65,9 +65,10 @@ public final class MenuListener implements Listener {
 
             if (g == null) return;
 
+            if (raw == 11) { player.closeInventory(); player.performCommand("guild home"); }
             if (raw == 12) player.openInventory(Menus.vaultMenu(plugin, g, g.getBankBalance()));
             if (raw == 13) player.openInventory(Menus.membersMenu(plugin, g));
-            if (raw == 14) player.openInventory(Menus.relationsMenu(g));
+            if (raw == 14) player.openInventory(Menus.relationsMenu(plugin, g));
             if (raw == 15) player.openInventory(Menus.guildLogMenu(g, 0));
             return;
         }
@@ -96,11 +97,44 @@ public final class MenuListener implements Listener {
             return;
         }
 
+        if (title.startsWith(Menus.TITLE_RELATION_GUILD)) {
+            event.setCancelled(true);
+            if (raw >= 0 && raw < 9 && g != null) {
+                player.openInventory(Menus.relationsMenu(plugin, g));
+            }
+            return;
+        }
+
         if (title.equals(Menus.TITLE_MEMBERS) || title.equals(Menus.TITLE_RELATIONS)) {
             event.setCancelled(true);
+
             if (raw >= 0 && raw < 9) {
                 if (g != null) player.openInventory(Menus.yourGuildMenu(g));
                 else player.openInventory(Menus.mainMenu(plugin, player.getUniqueId()));
+                return;
+            }
+
+            if (title.equals(Menus.TITLE_RELATIONS) && raw >= 9 && g != null) {
+                ItemStack clicked = event.getCurrentItem();
+                if (clicked != null && clicked.getType().name().endsWith("PLAYER_HEAD")) {
+                    String stripped = org.bukkit.ChatColor.stripColor(
+                            clicked.getItemMeta() == null ? "" : clicked.getItemMeta().getDisplayName()
+                    );
+
+                    for (String allyId : g.getAllies()) {
+                        Guild ally = plugin.storage().getGuild(allyId);
+                        if (ally == null) continue;
+
+                        String allyName = org.bukkit.ChatColor.stripColor(
+                                com.magicera.guilds.util.Text.color(ally.getName())
+                        );
+
+                        if (allyName != null && allyName.equalsIgnoreCase(stripped)) {
+                            player.openInventory(Menus.relationGuildMembersMenu(plugin, ally));
+                            break;
+                        }
+                    }
+                }
             }
         }
     }
