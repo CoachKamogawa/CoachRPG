@@ -11,6 +11,7 @@ import com.magicera.guilds.util.Text;
 import net.milkbowl.vault.economy.Economy;
 import net.milkbowl.vault.economy.EconomyResponse;
 import org.bukkit.Bukkit;
+import org.bukkit.Location;
 import org.bukkit.OfflinePlayer;
 import org.bukkit.Sound;
 import org.bukkit.command.Command;
@@ -33,7 +34,7 @@ public final class GuildCommand implements TabExecutor {
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
 
         if (args.length == 0) {
-            sendHelp(sender);
+            sendHelp(sender, 1);
             return true;
         }
 
@@ -43,7 +44,13 @@ public final class GuildCommand implements TabExecutor {
         // HELP / MENU
         // -------------------------
         if (sub.equals("help")) {
-            sendHelp(sender);
+            int page = parseHelpPage(args, 1);
+            sendHelp(sender, page);
+            return true;
+        }
+
+        if (sub.matches("\\d+")) {
+            sendHelp(sender, parseHelpPage(args, 0));
             return true;
         }
 
@@ -52,9 +59,184 @@ public final class GuildCommand implements TabExecutor {
                 sender.sendMessage("§cPlayers only.");
                 return true;
             }
-            // If you have a GUI menu, call it here. Otherwise, fall back to help.
-            // player.openInventory(Menus.mainMenu(plugin, player.getUniqueId()));
-            sendHelp(sender);
+            player.openInventory(com.magicera.guilds.gui.Menus.mainMenu(plugin, player.getUniqueId()));
+            return true;
+        }
+
+        // -------------------------
+        // CHAT
+        // -------------------------
+        if (sub.equals("chat")) {
+            if (!(sender instanceof Player player)) {
+                sender.sendMessage("§cPlayers only.");
+                return true;
+            }
+            PlayerData pd = plugin.storage().getOrCreatePlayer(player.getUniqueId());
+            if (pd.getGuildId() == null) {
+                sender.sendMessage("§cYou are not in a guild.");
+                return true;
+            }
+            pd.setGuildChatEnabled(!pd.isGuildChatEnabled());
+            plugin.storage().save();
+            sender.sendMessage(pd.isGuildChatEnabled() ? "§aGuild chat enabled." : "§eGuild chat disabled.");
+            return true;
+        }
+
+        // -------------------------
+        // HOME
+        // -------------------------
+        if (sub.equals("home")) {
+            if (!(sender instanceof Player player)) {
+                sender.sendMessage("§cPlayers only.");
+                return true;
+            }
+            PlayerData pd = plugin.storage().getOrCreatePlayer(player.getUniqueId());
+            if (pd.getGuildId() == null) {
+                sender.sendMessage("§cYou are not in a guild.");
+                return true;
+            }
+            Guild g = plugin.storage().getGuild(pd.getGuildId());
+            if (g == null || !g.hasHome()) {
+                sender.sendMessage("§cYour guild has no home set.");
+                return true;
+            }
+            org.bukkit.World world = Bukkit.getWorld(g.getHomeWorld());
+            if (world == null) {
+                sender.sendMessage("§cGuild home world is unavailable.");
+                return true;
+            }
+            Location loc = new Location(world, g.getHomeX() + 0.5, g.getHomeY(), g.getHomeZ() + 0.5);
+            player.teleport(loc);
+            sender.sendMessage("§aTeleported to guild home.");
+            return true;
+        }
+
+        if (sub.equals("sethome")) {
+            if (!(sender instanceof Player player)) {
+                sender.sendMessage("§cPlayers only.");
+                return true;
+            }
+            PlayerData pd = plugin.storage().getOrCreatePlayer(player.getUniqueId());
+            if (pd.getGuildId() == null) {
+                sender.sendMessage("§cYou are not in a guild.");
+                return true;
+            }
+            Guild g = plugin.storage().getGuild(pd.getGuildId());
+            if (g == null) return true;
+            GuildRole role = g.getMembers().get(player.getUniqueId());
+            if (role != GuildRole.MASTER) {
+                sender.sendMessage("§cOnly the guild master can set home.");
+                return true;
+            }
+            Location l = player.getLocation();
+            g.setHome(l.getWorld().getName(), l.getBlockX(), l.getBlockY(), l.getBlockZ());
+            g.addLogEntry("Home set by " + player.getName());
+            plugin.storage().save();
+            sender.sendMessage("§aGuild home set.");
+            return true;
+        }
+
+        if (sub.equals("claimland")) {
+            if (!(sender instanceof Player player)) {
+                sender.sendMessage("§cPlayers only.");
+                return true;
+            }
+            PlayerData pd = plugin.storage().getOrCreatePlayer(player.getUniqueId());
+            if (pd.getGuildId() == null) {
+                sender.sendMessage("§cYou are not in a guild.");
+                return true;
+            }
+            Guild g = plugin.storage().getGuild(pd.getGuildId());
+            if (g == null) return true;
+            GuildRole role = g.getMembers().get(player.getUniqueId());
+            if (role != GuildRole.MASTER && !g.isMembersCanClaim()) {
+                sender.sendMessage("§cGuild master has disabled member claims.");
+                return true;
+            }
+            if (role != GuildRole.MASTER && pd.getPower() < 10.0) {
+                sender.sendMessage("§cYou need at least 10 power to claim a chunk.");
+                return true;
+            }
+            String key = Guild.chunkKey(player.getWorld().getName(), player.getChunk().getX(), player.getChunk().getZ());
+            for (Guild other : plugin.storage().allGuilds()) {
+                if (other.getClaimedChunks().contains(key)) {
+                    sender.sendMessage("§cThat chunk is already claimed by " + other.getName());
+                    return true;
+                }
+            }
+            int max = maxClaims(g);
+            if (g.getClaimedChunks().size() >= max) {
+                sender.sendMessage("§cGuild claim cap reached (§f" + max + "§c). Increase guild power.");
+                return true;
+            }
+            g.getClaimedChunks().add(key);
+            g.addLogEntry("Claimed land at " + key + " by " + player.getName());
+            plugin.storage().save();
+            sender.sendMessage("§aChunk claimed for your guild.");
+            return true;
+        }
+
+        if (sub.equals("claimtoggle")) {
+            if (!(sender instanceof Player player)) return true;
+            PlayerData pd = plugin.storage().getOrCreatePlayer(player.getUniqueId());
+            Guild g = pd.getGuildId() == null ? null : plugin.storage().getGuild(pd.getGuildId());
+            if (g == null) return true;
+            if (g.getMembers().get(player.getUniqueId()) != GuildRole.MASTER) {
+                sender.sendMessage("§cOnly the guild master can toggle member claims.");
+                return true;
+            }
+            g.setMembersCanClaim(!g.isMembersCanClaim());
+            plugin.storage().save();
+            sender.sendMessage(g.isMembersCanClaim() ? "§aMembers can now claim chunks." : "§eMembers can no longer claim chunks.");
+            return true;
+        }
+
+        if (sub.equals("ally") || sub.equals("war")) {
+            if (!(sender instanceof Player player)) return true;
+            if (args.length < 2) {
+                sender.sendMessage("§cUsage: /guild " + sub + " <player|guild>");
+                return true;
+            }
+            Guild actor = guildOf(player.getUniqueId());
+            if (actor == null) {
+                sender.sendMessage("§cYou are not in a guild.");
+                return true;
+            }
+            if (actor.getMembers().get(player.getUniqueId()) != GuildRole.MASTER) {
+                sender.sendMessage("§cOnly the guild master can use this command.");
+                return true;
+            }
+            Guild target = resolveGuildTarget(args[1]);
+            if (target == null || target.getId().equals(actor.getId())) {
+                sender.sendMessage("§cInvalid target guild.");
+                return true;
+            }
+            if (sub.equals("ally")) {
+                actor.getAllies().add(target.getId());
+                target.getAllies().add(actor.getId());
+                actor.getEnemies().remove(target.getId());
+                target.getEnemies().remove(actor.getId());
+                actor.addLogEntry("Alliance formed with " + target.getName());
+                target.addLogEntry("Alliance formed with " + actor.getName());
+                plugin.storage().save();
+                sender.sendMessage("§aAlliance formed with " + target.getName());
+            } else {
+                boolean sameFavor = actor.getAlignment() == target.getAlignment();
+                if (sameFavor) {
+                    sender.sendMessage("§eSame favor war request auto-accepted in this build.");
+                }
+                actor.getEnemies().add(target.getId());
+                target.getEnemies().add(actor.getId());
+                actor.getAllies().remove(target.getId());
+                target.getAllies().remove(actor.getId());
+                actor.setInWar(true);
+                target.setInWar(true);
+                long warEnd = System.currentTimeMillis() + (24L * 60L * 60L * 1000L);
+                actor.setWarEndsAtEpochMs(warEnd);
+                target.setWarEndsAtEpochMs(warEnd);
+                plugin.storage().save();
+                Bukkit.broadcastMessage("§7[§5Magic Era§7] §f" + Text.stripColors(actor.getName()) + " has declared war on " + Text.stripColors(target.getName()) + "!");
+            }
             return true;
         }
 
@@ -319,6 +501,11 @@ public final class GuildCommand implements TabExecutor {
 
             String rawName = parsed.guildName;
             String rawPrefix = parsed.displayName;
+
+            if (!isBoldOnlyName(rawName)) {
+                sender.sendMessage("§cGuild names may only use bold formatting (&l). No underline/italic/strikethrough/magic/reset.");
+                return true;
+            }
 
             String id = Text.normalizeId(rawName);
             if (id == null || id.isBlank()) {
@@ -991,7 +1178,7 @@ public final class GuildCommand implements TabExecutor {
         }
 
         sender.sendMessage("§cUnknown subcommand.");
-        sendHelp(sender);
+        sendHelp(sender, 1);
         return true;
     }
 
@@ -1006,9 +1193,9 @@ public final class GuildCommand implements TabExecutor {
         // /guild <sub>
         if (args.length == 1) {
             List<String> subs = new ArrayList<>(List.of(
-                    "help", "menu",
+                    "help", "menu", "chat", "home", "sethome", "claimland", "claimtoggle", "ally", "war",
                     "create", "invite", "accept", "leave", "kick", "promote", "newmaster", "title", "deny", "disband", "impeach",
-                    "bank", "deposit", "withdraw", "tax"
+                    "bank", "deposit", "withdraw", "tax", "1", "2"
             ));
             if (sender.hasPermission("magicera.admin")) {
                 subs.add("reload");
@@ -1023,8 +1210,10 @@ public final class GuildCommand implements TabExecutor {
         String sub = args[0].toLowerCase();
 
         // /guild invite <player> etc
-        if ((sub.equals("invite") || sub.equals("kick") || sub.equals("newmaster") || sub.equals("promote") || sub.equals("title")) && args.length == 2) {
-            return filterPrefix(onlinePlayerNames(), input);
+        if ((sub.equals("invite") || sub.equals("kick") || sub.equals("newmaster") || sub.equals("promote") || sub.equals("title") || sub.equals("ally") || sub.equals("war")) && args.length == 2) {
+            List<String> opts = new ArrayList<>(onlinePlayerNames());
+            opts.addAll(plugin.storage().allGuilds().stream().map(Guild::getId).toList());
+            return filterPrefix(opts, input);
         }
 
         if ((sub.equals("add") || sub.equals("adminadd") || sub.equals("adminkick")) && args.length == 2) {
@@ -1082,35 +1271,86 @@ public final class GuildCommand implements TabExecutor {
     // HELP + PARSING
     // -------------------------
 
-    private void sendHelp(CommandSender sender) {
+    private void sendHelp(CommandSender sender, int page) {
+        if (page <= 1) {
+            sender.sendMessage("§8§m--------------------------------");
+            sender.sendMessage("§7[§aGuild§7] §fGuild Commands §8(Page 1/2)");
+            sender.sendMessage("§8§m--------------------------------");
+            sender.sendMessage("§7/guild §8(opens menu)");
+            sender.sendMessage("§7/guild menu");
+            sender.sendMessage("§7/guild help §8or /guild <1|2>");
+            sender.sendMessage("§7/guild create \"<name>\" <displayName>");
+            sender.sendMessage("§7Example: §f/guild create &l&cFairy &l&eTail");
+            sender.sendMessage("§7/guild invite <player>");
+            sender.sendMessage("§7/guild accept");
+            sender.sendMessage("§7/guild deny");
+            sender.sendMessage("§7/guild leave");
+            sender.sendMessage("§7/guild kick <player>");
+            sender.sendMessage("§7/guild promote <player>");
+            sender.sendMessage("§7/guild newmaster <player>");
+            sender.sendMessage("§7/guild title <player> <text|clear>");
+            sender.sendMessage("§7/guild disband confirm");
+            return;
+        }
+
         sender.sendMessage("§8§m--------------------------------");
-        sender.sendMessage("§7[§aGuild§7] §fGuild Commands §8(Page 1/1)");
-        sender.sendMessage("§8§m--------------------------------");
-        sender.sendMessage("§7/guild menu");
-        sender.sendMessage("§7/guild create \"<name>\" <displayName>");
-        sender.sendMessage("§7Example: §f/guild create \"White Rose\" &aWR");
-        sender.sendMessage("§7/guild invite <player>");
-        sender.sendMessage("§7/guild kick <player>");
-        sender.sendMessage("§7/guild promote <player>");
-        sender.sendMessage("§7/guild newmaster <player>");
-        sender.sendMessage("§7/guild leave");
-        sender.sendMessage("§7/guild title <player> <text|clear>");
-        sender.sendMessage("§7/guild accept");
-        sender.sendMessage("§7/guild deny");
-        sender.sendMessage("§7/guild disband confirm");
-        sender.sendMessage("§7/guild impeach §8(or /guild impeach <remove|keep>)");
+        sender.sendMessage("§7[§aGuild§7] §fGuild Commands §8(Page 2/2)");
         sender.sendMessage("§8§m--------------------------------");
         sender.sendMessage("§7/guild bank");
         sender.sendMessage("§7/guild deposit <amount>");
         sender.sendMessage("§7/guild withdraw <amount>");
         sender.sendMessage("§7/guild tax <0-9>");
+        sender.sendMessage("§7/guild home");
+        sender.sendMessage("§7/guild sethome");
+        sender.sendMessage("§7/guild claimland");
+        sender.sendMessage("§7/guild claimtoggle");
+        sender.sendMessage("§7/guild ally <player|guild>");
+        sender.sendMessage("§7/guild war <player|guild>");
+        sender.sendMessage("§7/guild chat");
+        sender.sendMessage("§7/guild impeach §8(or /guild impeach <remove|keep>)");
         if (sender.hasPermission("magicera.admin")) {
-            sender.sendMessage("§7/guild reload");
-            sender.sendMessage("§7/guild add <player> <guild>");
-            sender.sendMessage("§7/guild adminadd <player> <guild> §8(alias)");
-            sender.sendMessage("§7/guild adminkick <player> <guild>");
-            sender.sendMessage("§7/guild forcetax");
+            sender.sendMessage("§7/guild reload | add | adminadd | adminkick | forcetax");
         }
+    }
+
+    private int parseHelpPage(String[] args, int index) {
+        if (args.length <= index) return 1;
+        try {
+            int p = Integer.parseInt(args[index]);
+            return p <= 1 ? 1 : 2;
+        } catch (NumberFormatException ignored) {
+            return 1;
+        }
+    }
+
+    private boolean isBoldOnlyName(String name) {
+        String n = name.toLowerCase();
+        return !(n.contains("&n") || n.contains("&m") || n.contains("&o") || n.contains("&k") || n.contains("&r"));
+    }
+
+    private Guild guildOf(UUID playerId) {
+        PlayerData pd = plugin.storage().getOrCreatePlayer(playerId);
+        return pd.getGuildId() == null ? null : plugin.storage().getGuild(pd.getGuildId());
+    }
+
+    private Guild resolveGuildTarget(String token) {
+        Player online = Bukkit.getPlayerExact(token);
+        if (online != null) {
+            Guild g = guildOf(online.getUniqueId());
+            if (g != null) return g;
+        }
+        return plugin.storage().getGuild(Text.normalizeId(token));
+    }
+
+    private int maxClaims(Guild guild) {
+        int max = 4;
+        for (UUID memberId : guild.getMembers().keySet()) {
+            PlayerData pd = plugin.storage().getOrCreatePlayer(memberId);
+            GuildRole role = guild.getMembers().get(memberId);
+            if (role == GuildRole.MASTER) continue;
+            max += (int) Math.floor(pd.getPower() / 10.0);
+        }
+        return max;
     }
 
     private static final class ParsedCreate {
