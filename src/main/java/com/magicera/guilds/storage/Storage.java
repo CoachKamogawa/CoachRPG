@@ -53,6 +53,7 @@ public final class Storage {
 
                 String name = s.getString("name", guildId);
                 String prefix = s.getString("prefix", guildId.substring(0, Math.min(4, guildId.length())));
+                String title = s.getString("title", "");
                 String alignStr = s.getString("alignment", "NEUTRAL");
 
                 GuildAlignment alignment;
@@ -63,6 +64,7 @@ public final class Storage {
                 }
 
                 Guild guild = new Guild(guildId, name, prefix, alignment);
+                guild.setTitle(title);
 
                 // NEW fields
                 guild.setBankBalance(s.getDouble("bankBalance", 0.0));
@@ -128,6 +130,7 @@ public final class Storage {
             String base = "guilds." + g.getId();
             guildsYaml.set(base + ".name", g.getName());
             guildsYaml.set(base + ".prefix", g.getPrefix());
+            guildsYaml.set(base + ".title", g.getTitle());
             guildsYaml.set(base + ".alignment", g.getAlignment().name());
 
             // NEW fields
