@@ -76,7 +76,8 @@ public final class GuildProtectionListener implements Listener {
         if (!(event.getEntity() instanceof Player victim)) return;
         Player attacker = asPlayerDamager(event.getDamager());
         if (attacker == null) return;
-        if (shouldBlockFriendlyFire(attacker, victim)) {
+
+        if (shouldBlockWarNeutralInteraction(attacker, victim) || shouldBlockFriendlyFire(attacker, victim)) {
             event.setCancelled(true);
         }
     }
@@ -86,7 +87,8 @@ public final class GuildProtectionListener implements Listener {
         if (!(event.getEntity() instanceof Player victim)) return;
         Player attacker = asPlayerDamager(event.getCombuster());
         if (attacker == null) return;
-        if (shouldBlockFriendlyFire(attacker, victim)) {
+
+        if (shouldBlockWarNeutralInteraction(attacker, victim) || shouldBlockFriendlyFire(attacker, victim)) {
             event.setCancelled(true);
         }
     }
@@ -96,6 +98,12 @@ public final class GuildProtectionListener implements Listener {
         if (!(event.getTarget() instanceof Player victim)) return;
         if (!(event.getSpellData().caster() instanceof Player caster)) return;
         if (caster.getUniqueId().equals(victim.getUniqueId())) return;
+
+        if (shouldBlockWarNeutralInteraction(caster, victim)) {
+            event.setCancelled(true);
+            event.setCastCancelled(true);
+            return;
+        }
 
         // Only block harmful spells when the relationship + toggles say so.
         if (!shouldBlockFriendlyFire(caster, victim)) return;
@@ -158,6 +166,35 @@ public final class GuildProtectionListener implements Listener {
         if (entity instanceof Player p) return p;
         if (entity instanceof Projectile proj && proj.getShooter() instanceof Player p) return p;
         return null;
+    }
+
+    private boolean shouldBlockWarNeutralInteraction(Player a, Player b) {
+        PlayerData ap = plugin.storage().getOrCreatePlayer(a.getUniqueId());
+        PlayerData bp = plugin.storage().getOrCreatePlayer(b.getUniqueId());
+        if (ap.getGuildId() == null || bp.getGuildId() == null) return false;
+
+        Guild ag = plugin.storage().getGuild(ap.getGuildId());
+        Guild bg = plugin.storage().getGuild(bp.getGuildId());
+        if (ag == null || bg == null || ag.getId().equals(bg.getId())) return false;
+
+        return isNeutralObserverAgainst(ag, bg) || isNeutralObserverAgainst(bg, ag);
+    }
+
+    private boolean isNeutralObserverAgainst(Guild observer, Guild belligerent) {
+        if (observer.isInWar() || !belligerent.isInWar()) return false;
+        if (!areAllied(observer, belligerent)) return false;
+
+        for (String enemyId : belligerent.getEnemies()) {
+            Guild enemy = plugin.storage().getGuild(enemyId);
+            if (enemy != null && areAllied(observer, enemy)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean areAllied(Guild a, Guild b) {
+        return a.getAllies().contains(b.getId()) || b.getAllies().contains(a.getId());
     }
 
     private boolean shouldBlockFriendlyFire(Player a, Player b) {
