@@ -223,9 +223,12 @@ public final class MenuListener implements Listener {
                 int before = oldCounts.getOrDefault(key, 0);
                 int after = newCounts.getOrDefault(key, 0);
                 int delta = after - before;
-                if (delta > 0) out.add("Vault add: " + actor + " +" + delta + " " + key);
-                if (delta < 0) out.add("Vault remove: " + actor + " " + delta + " " + key);
+
+                String label = displayFromKey(key);
+                if (delta > 0) out.add("Vault add: " + actor + " +" + delta + " " + label);
+                if (delta < 0) out.add("Vault remove: " + actor + " " + delta + " " + label);
             }
+
             if (out.isEmpty()) out.add("Vault checked by " + actor + " (no item changes)");
             return out;
         }
@@ -233,22 +236,42 @@ public final class MenuListener implements Listener {
         private static Map<String, Integer> count(ItemStack[] items) {
             Map<String, Integer> counts = new HashMap<>();
             if (items == null) return counts;
+
             for (ItemStack it : items) {
                 if (it == null || it.getType().isAir()) continue;
 
                 String customName = it.hasItemMeta()
                         && it.getItemMeta() != null
                         && it.getItemMeta().hasDisplayName()
-                        ? org.bukkit.ChatColor.stripColor(it.getItemMeta().getDisplayName())
+                        ? it.getItemMeta().getDisplayName()
                         : null;
 
-                String key = customName != null && !customName.isBlank()
-                        ? customName + " [" + it.getType().name() + "]"
-                        : it.getType().name();
+                String materialName = prettifyMaterial(it.getType().name());
+                String label = customName != null && !customName.isBlank()
+                        ? customName
+                        : materialName;
 
+                String key = label + "\u0000" + it.getType().name();
                 counts.merge(key, it.getAmount(), Integer::sum);
             }
+
             return counts;
+        }
+
+        private static String displayFromKey(String key) {
+            int split = key.indexOf('\u0000');
+            return split >= 0 ? key.substring(0, split) : key;
+        }
+
+        private static String prettifyMaterial(String materialName) {
+            String[] parts = materialName.toLowerCase(Locale.ROOT).split("_");
+            StringBuilder out = new StringBuilder();
+            for (String part : parts) {
+                if (part.isBlank()) continue;
+                if (out.length() > 0) out.append(' ');
+                out.append(Character.toUpperCase(part.charAt(0))).append(part.substring(1));
+            }
+            return out.toString();
         }
     }
 }
