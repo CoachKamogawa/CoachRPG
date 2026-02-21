@@ -721,6 +721,58 @@ public final class GuildCommand implements TabExecutor {
         }
 
         // -------------------------
+        // RENAME
+        // -------------------------
+        if (sub.equals("rename")) {
+            if (!(sender instanceof Player player)) {
+                sender.sendMessage("§cPlayers only.");
+                return true;
+            }
+
+            PlayerData pd = plugin.storage().getOrCreatePlayer(player.getUniqueId());
+            Guild g = pd.getGuildId() == null ? null : plugin.storage().getGuild(pd.getGuildId());
+            if (g == null) {
+                sender.sendMessage("§cYou are not in a guild.");
+                return true;
+            }
+            if (g.getMembers().get(player.getUniqueId()) != GuildRole.MASTER) {
+                sender.sendMessage("§cOnly the Guild Master can rename the guild.");
+                return true;
+            }
+            if (args.length < 2) {
+                sender.sendMessage("§cUsage: /guild rename \"<name>\"");
+                return true;
+            }
+
+            String rawName = parseGuildNameArg(args, 1);
+            if (rawName == null) {
+                sender.sendMessage("§cUsage: /guild rename \"<name>\"");
+                return true;
+            }
+            if (!isBoldOnlyName(rawName)) {
+                sender.sendMessage("§cGuild names may only use bold formatting (&l). No underline/italic/strikethrough/magic/reset.");
+                return true;
+            }
+
+            String newId = Text.normalizeId(rawName);
+            if (newId == null || newId.isBlank()) {
+                sender.sendMessage("§cInvalid guild name.");
+                return true;
+            }
+            if (!newId.equals(g.getId()) && plugin.storage().guildExists(newId)) {
+                sender.sendMessage("§cThat guild name is already taken.");
+                return true;
+            }
+
+            String oldName = g.getName();
+            g.setName(rawName);
+            g.addLogEntry("Guild renamed from " + oldName + " to " + rawName + " by " + player.getName());
+            plugin.storage().save();
+            Bukkit.broadcastMessage("§7[§bMagic Era§7] " + oldName + " §fhas been renamed to " + rawName + "§f.");
+            return true;
+        }
+
+        // -------------------------
         // INFO
         // -------------------------
         if (sub.equals("info")) {
@@ -1461,7 +1513,7 @@ public final class GuildCommand implements TabExecutor {
             List<String> subs = new ArrayList<>(List.of(
                     "help", "menu", "chat", "home", "sethome", "claimland", "claimtoggle", "unclaim", "ally", "unally", "war", "truce",
                     "create", "invite", "accept", "leave", "kick", "promote", "newmaster", "title", "deny", "disband", "impeach",
-                    "bank", "deposit", "withdraw", "tax", "desc", "info", "power", "friendlyfire", "allyfire", "?", "1", "2"
+                    "bank", "deposit", "withdraw", "tax", "desc", "rename", "info", "power", "friendlyfire", "allyfire", "?", "1", "2"
             ));
             if (sender.hasPermission("magicera.admin")) {
                 subs.add("reload");
@@ -1492,7 +1544,7 @@ public final class GuildCommand implements TabExecutor {
             return filterPrefix(guildIds, input);
         }
 
-        if (sub.equals("war") && args.length == 3 && args[1].equalsIgnoreCase("accept")) {
+        if ((sub.equals("war") || sub.equals("ally")) && args.length == 3 && args[1].equalsIgnoreCase("accept")) {
             List<String> guildIds = plugin.storage().allGuilds().stream().map(Guild::getId).sorted().collect(Collectors.toList());
             return filterPrefix(guildIds, input);
         }
@@ -1603,6 +1655,7 @@ public final class GuildCommand implements TabExecutor {
             if (role == GuildRole.MASTER) {
                 sender.sendMessage("§7/guild newmaster <player>");
                 sender.sendMessage("§7/guild desc <description>");
+                sender.sendMessage("§7/guild rename \"<name>\"");
                 sender.sendMessage("§7/guild disband §8(then confirm)");
             }
             return;
@@ -1621,6 +1674,7 @@ public final class GuildCommand implements TabExecutor {
             sender.sendMessage("§7/guild friendlyfire <on|off>");
             sender.sendMessage("§7/guild allyfire <on|off>");
             sender.sendMessage("§7/guild ally <player|guild>");
+            sender.sendMessage("§7/guild ally accept <guild>");
             sender.sendMessage("§7/guild unally <player|guild>");
             sender.sendMessage("§7/guild war <player|guild>");
             sender.sendMessage("§7/guild war accept <guild>");
@@ -1710,10 +1764,6 @@ public final class GuildCommand implements TabExecutor {
 
     private boolean handleAllyCommand(CommandSender sender, String[] args) {
         if (!(sender instanceof Player player)) return true;
-        if (args.length < 2) {
-            sender.sendMessage("§cUsage: /guild ally <player|guild>");
-            return true;
-        }
 
         Guild actor = guildOf(player.getUniqueId());
         if (actor == null) {
@@ -1725,9 +1775,43 @@ public final class GuildCommand implements TabExecutor {
             return true;
         }
 
+        if (args.length >= 3 && args[1].equalsIgnoreCase("accept")) {
+            Guild requester = resolveGuildTarget(args[2]);
+            if (requester == null || requester.getId().equals(actor.getId())) {
+                sender.sendMessage("§cInvalid target guild.");
+                return true;
+            }
+            if (!actor.getPendingAllyRequests().remove(requester.getId())) {
+                sender.sendMessage("§cNo pending ally request from that guild.");
+                return true;
+            }
+
+            requester.getPendingAllyRequests().remove(actor.getId());
+            actor.getAllies().add(requester.getId());
+            requester.getAllies().add(actor.getId());
+            actor.getEnemies().remove(requester.getId());
+            requester.getEnemies().remove(actor.getId());
+            actor.addLogEntry("Alliance formed with " + requester.getName());
+            requester.addLogEntry("Alliance formed with " + actor.getName());
+            plugin.storage().save();
+
+            Bukkit.broadcastMessage("§7[§bMagic Era§7] " + actor.getName() + " §fand " + requester.getName() + " §fhave formed an alliance!");
+            return true;
+        }
+
+        if (args.length < 2) {
+            sender.sendMessage("§cUsage: /guild ally <player|guild> or /guild ally accept <guild>");
+            return true;
+        }
+
         Guild target = resolveGuildTarget(args[1]);
         if (target == null || target.getId().equals(actor.getId())) {
             sender.sendMessage("§cInvalid target guild.");
+            return true;
+        }
+
+        if (actor.getAllies().contains(target.getId())) {
+            sender.sendMessage("§cYour guild is already allied with that guild.");
             return true;
         }
 
@@ -1736,17 +1820,25 @@ public final class GuildCommand implements TabExecutor {
             return true;
         }
 
-        actor.getPendingAllyRequests().remove(target.getId());
-        target.getPendingAllyRequests().remove(actor.getId());
-        actor.getAllies().add(target.getId());
-        target.getAllies().add(actor.getId());
-        actor.getEnemies().remove(target.getId());
-        target.getEnemies().remove(actor.getId());
-        actor.addLogEntry("Alliance formed with " + target.getName());
-        target.addLogEntry("Alliance formed with " + actor.getName());
+        long now = System.currentTimeMillis();
+        long cooldownUntil = actor.getAllyRequestCooldowns().getOrDefault(target.getId(), 0L);
+        if (cooldownUntil > now) {
+            sender.sendMessage("§cYou can request an alliance with " + target.getName() + " again in §f" + formatDuration(cooldownUntil - now) + "§c.");
+            return true;
+        }
+
+        target.getPendingAllyRequests().add(actor.getId());
+        actor.getAllyRequestCooldowns().put(target.getId(), now + (30L * 60L * 1000L));
         plugin.storage().save();
 
-        Bukkit.broadcastMessage("§7[§bMagic Era§7] " + actor.getName() + " §fand " + target.getName() + " §fhave formed an alliance!");
+        sender.sendMessage("§eAlliance request sent to " + target.getName() + ". They must accept with /guild ally accept " + actor.getId());
+
+        Player targetMaster = onlineGuildMaster(target);
+        if (targetMaster != null) {
+            targetMaster.sendMessage("§7[§bMagic Era§7] §e" + actor.getName() + " §fhas requested an alliance.");
+            targetMaster.sendMessage("§7Use §a/guild ally accept " + actor.getId() + " §7to accept.");
+        }
+
         return true;
     }
 
@@ -1789,10 +1881,29 @@ public final class GuildCommand implements TabExecutor {
             return true;
         }
 
+        if (actor.getEnemies().contains(target.getId())) {
+            sender.sendMessage("§cYour guild is already at war with that guild.");
+            return true;
+        }
+
         if (actor.getAlignment() == GuildAlignment.HONORABLE) {
+            long now = System.currentTimeMillis();
+            long cooldownUntil = actor.getWarRequestCooldowns().getOrDefault(target.getId(), 0L);
+            if (cooldownUntil > now) {
+                sender.sendMessage("§cYou can request war with " + target.getName() + " again in §f" + formatDuration(cooldownUntil - now) + "§c.");
+                return true;
+            }
+
             target.getPendingWarRequests().add(actor.getId());
+            actor.getWarRequestCooldowns().put(target.getId(), now + (30L * 60L * 1000L));
             plugin.storage().save();
             sender.sendMessage("§eWar request sent to " + target.getName() + ". They must accept with /guild war accept " + actor.getId());
+
+            Player targetMaster = onlineGuildMaster(target);
+            if (targetMaster != null) {
+                targetMaster.sendMessage("§7[§bMagic Era§7] §c" + actor.getName() + " §fhas requested war.");
+                targetMaster.sendMessage("§7Use §a/guild war accept " + actor.getId() + " §7to accept.");
+            }
             return true;
         }
 
@@ -1845,6 +1956,25 @@ public final class GuildCommand implements TabExecutor {
         return b.getAlignment() == GuildAlignment.HONORABLE;
     }
 
+    private Player onlineGuildMaster(Guild guild) {
+        if (guild == null) return null;
+        for (Map.Entry<UUID, GuildRole> e : guild.getMembers().entrySet()) {
+            if (e.getValue() == GuildRole.MASTER) {
+                return Bukkit.getPlayer(e.getKey());
+            }
+        }
+        return null;
+    }
+
+    private String formatDuration(long millis) {
+        long totalSeconds = Math.max(1L, millis / 1000L);
+        long minutes = totalSeconds / 60L;
+        long seconds = totalSeconds % 60L;
+        if (minutes <= 0L) return seconds + "s";
+        if (seconds == 0L) return minutes + "m";
+        return minutes + "m " + seconds + "s";
+    }
+
     private double guildPower(Guild g) {
         double power = 0.0;
         for (UUID id : g.getMembers().keySet()) {
@@ -1860,6 +1990,20 @@ public final class GuildCommand implements TabExecutor {
             this.guildName = guildName;
             this.displayName = displayName;
         }
+    }
+
+    private String parseGuildNameArg(String[] args, int startIndex) {
+        if (args.length <= startIndex) return null;
+        String joined = String.join(" ", Arrays.copyOfRange(args, startIndex, args.length)).trim();
+        if (joined.isEmpty()) return null;
+
+        if (joined.startsWith("\"")) {
+            int secondQuote = joined.indexOf('"', 1);
+            if (secondQuote <= 1) return null;
+            return joined.substring(1, secondQuote).trim();
+        }
+
+        return args[startIndex].trim();
     }
 
     private ParsedCreate parseCreateArgs(String[] args) {
