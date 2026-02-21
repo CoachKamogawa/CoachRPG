@@ -55,19 +55,30 @@ public final class GuildMaintenanceTask implements Runnable {
             if (masterAlign != guild.getAlignment()) {
                 if (guild.getMasterOutOfFavorSinceEpochMs() == null) {
                     guild.setMasterOutOfFavorSinceEpochMs(now);
+                    guild.setMasterOutOfFavorWarnEpochMs(null);
                 }
+
                 long remaining = Math.max(0L, outOfFavorMs - (now - guild.getMasterOutOfFavorSinceEpochMs()));
                 var p = Bukkit.getPlayer(masterId);
-                if (p != null) {
+
+                long warnIntervalMs = TimeUnit.MINUTES.toMillis(15);
+                Long lastWarn = guild.getMasterOutOfFavorWarnEpochMs();
+                boolean shouldWarn = lastWarn == null || (now - lastWarn) >= warnIntervalMs;
+
+                if (p != null && shouldWarn) {
                     String favorWord = coloredFavor(guild.getAlignment());
                     p.sendMessage(Text.color("&7[&aGuild&7] &cYou are out of favor with your guild. You have &e" + formatRemaining(remaining) + " &cto restore your " + favorWord + "&c."));
+                    guild.setMasterOutOfFavorWarnEpochMs(now);
                 }
+
                 if (remaining == 0L) {
                     assignNewMaster(guild, "Guild Master removed for being out of favor");
                     guild.setMasterOutOfFavorSinceEpochMs(null);
+                    guild.setMasterOutOfFavorWarnEpochMs(null);
                 }
             } else {
                 guild.setMasterOutOfFavorSinceEpochMs(null);
+                guild.setMasterOutOfFavorWarnEpochMs(null);
             }
 
             processImpeachment(guild, now);
