@@ -26,6 +26,7 @@ import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.command.PluginCommand;
 import org.bukkit.command.TabCompleter;
+import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.plugin.java.JavaPlugin;
 
@@ -54,7 +55,7 @@ public final class MagicEraGuildsPlugin extends JavaPlugin {
     public VaultLogManager vaultLogs() { return vaultLogs; }
     public EconomyHook economy() { return economyHook; }
     public GuildPowerService guildPower() { return guildPower; }
-    public YamlConfiguration territoryConfig() { return territoryConfig == null ? getConfig() : territoryConfig; }
+    public FileConfiguration territoryConfig() { return territoryConfig == null ? getConfig() : territoryConfig; }
     public long nextGuildTaxEpochMs() { return nextGuildTaxEpochMs; }
 
     @Override
