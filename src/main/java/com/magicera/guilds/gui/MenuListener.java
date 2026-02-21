@@ -46,7 +46,7 @@ public final class MenuListener implements Listener {
                 }
                 Guild g = plugin.storage().getGuild(pd.getGuildId());
                 if (g == null) return;
-                player.openInventory(Menus.yourGuildMenu(g));
+                player.openInventory(Menus.yourGuildMenu(plugin, g));
                 return;
             }
 
@@ -83,7 +83,7 @@ public final class MenuListener implements Listener {
         if (title.equals(Menus.TITLE_VAULT)) {
             if (raw < 9) {
                 event.setCancelled(true);
-                if (g != null) player.openInventory(Menus.yourGuildMenu(g));
+                if (g != null) player.openInventory(Menus.yourGuildMenu(plugin, g));
             }
             return;
         }
@@ -95,7 +95,7 @@ public final class MenuListener implements Listener {
             int page = parsePage(title);
 
             if (raw >= 1 && raw <= 7) {
-                player.openInventory(Menus.yourGuildMenu(g));
+                player.openInventory(Menus.yourGuildMenu(plugin, g));
                 return;
             }
 
@@ -135,7 +135,7 @@ public final class MenuListener implements Listener {
             event.setCancelled(true);
 
             if (raw >= 0 && raw < 9) {
-                if (g != null) player.openInventory(Menus.yourGuildMenu(g));
+                if (g != null) player.openInventory(Menus.yourGuildMenu(plugin, g));
                 else player.openInventory(Menus.mainMenu(plugin, player.getUniqueId()));
                 return;
             }
@@ -228,7 +228,7 @@ public final class MenuListener implements Listener {
                 if (it == null || it.getType().isAir()) continue;
                 String name = it.hasItemMeta() && it.getItemMeta() != null && it.getItemMeta().hasDisplayName()
                         ? org.bukkit.ChatColor.stripColor(it.getItemMeta().getDisplayName())
-                        : it.getType().name().toLowerCase(Locale.ROOT);
+                        : it.getI18NDisplayName();
                 counts.merge(name, it.getAmount(), Integer::sum);
             }
             return counts;
