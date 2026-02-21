@@ -50,6 +50,8 @@ public final class Guild {
     // pending relationship requests
     private final Set<String> pendingAllyRequests = new HashSet<>();
     private final Set<String> pendingWarRequests = new HashSet<>();
+    private final Map<String, Long> allyRequestCooldowns = new HashMap<>();
+    private final Map<String, Long> warRequestCooldowns = new HashMap<>();
 
     public Guild(String id, String name, String prefix, GuildAlignment alignment) {
         this.id = id;
@@ -212,6 +214,8 @@ public final class Guild {
 
     public Set<String> getPendingAllyRequests() { return pendingAllyRequests; }
     public Set<String> getPendingWarRequests() { return pendingWarRequests; }
+    public Map<String, Long> getAllyRequestCooldowns() { return allyRequestCooldowns; }
+    public Map<String, Long> getWarRequestCooldowns() { return warRequestCooldowns; }
 
     public static String chunkKey(String world, int x, int z) {
         return world + ":" + x + ":" + z;
