@@ -315,7 +315,7 @@ public final class GuildCommand implements TabExecutor {
         }
 
         // -------------------------
-        // FRIENDLY FIRE
+        // FRIENDLY FIRE (guild-wide toggle)
         // -------------------------
         if (sub.equals("friendlyfire")) {
             if (!(sender instanceof Player player)) {
@@ -326,13 +326,61 @@ public final class GuildCommand implements TabExecutor {
                 sender.sendMessage("§cUsage: /guild friendlyfire <on|off>");
                 return true;
             }
+
             PlayerData pd = plugin.storage().getOrCreatePlayer(player.getUniqueId());
-            boolean protect = args[1].equalsIgnoreCase("on");
-            pd.setFriendlyFireProtection(protect);
+            Guild g = pd.getGuildId() == null ? null : plugin.storage().getGuild(pd.getGuildId());
+            if (g == null) {
+                sender.sendMessage("§cYou are not in a guild.");
+                return true;
+            }
+
+            GuildRole role = g.getMembers().get(player.getUniqueId());
+            if (role != GuildRole.MASTER) {
+                sender.sendMessage("§cOnly the guild master can toggle friendly fire.");
+                return true;
+            }
+
+            boolean enabled = args[1].equalsIgnoreCase("on");
+            g.setFriendlyFireEnabled(enabled);
             plugin.storage().save();
-            sender.sendMessage(protect
-                    ? "§aFriendly fire protection enabled."
-                    : "§eFriendly fire protection disabled. Both players must disable protection for friendly damage to apply.");
+            sender.sendMessage(enabled
+                    ? "§eGuild friendly fire enabled. Guild members can now damage each other."
+                    : "§aGuild friendly fire disabled. Guild members can no longer damage each other.");
+            return true;
+        }
+
+        // -------------------------
+        // ALLY FIRE (guild-wide toggle)
+        // -------------------------
+        if (sub.equals("allyfire")) {
+            if (!(sender instanceof Player player)) {
+                sender.sendMessage("§cPlayers only.");
+                return true;
+            }
+            if (args.length < 2 || (!args[1].equalsIgnoreCase("on") && !args[1].equalsIgnoreCase("off"))) {
+                sender.sendMessage("§cUsage: /guild allyfire <on|off>");
+                return true;
+            }
+
+            PlayerData pd = plugin.storage().getOrCreatePlayer(player.getUniqueId());
+            Guild g = pd.getGuildId() == null ? null : plugin.storage().getGuild(pd.getGuildId());
+            if (g == null) {
+                sender.sendMessage("§cYou are not in a guild.");
+                return true;
+            }
+
+            GuildRole role = g.getMembers().get(player.getUniqueId());
+            if (role != GuildRole.MASTER) {
+                sender.sendMessage("§cOnly the guild master can toggle ally fire.");
+                return true;
+            }
+
+            boolean enabled = args[1].equalsIgnoreCase("on");
+            g.setAllyFireEnabled(enabled);
+            plugin.storage().save();
+            sender.sendMessage(enabled
+                    ? "§eAlly fire enabled for your guild. Allied PvP/spells require both guilds to have ally fire on."
+                    : "§aAlly fire disabled for your guild. Allied PvP/spells are now blocked.");
             return true;
         }
 
@@ -1413,7 +1461,7 @@ public final class GuildCommand implements TabExecutor {
             List<String> subs = new ArrayList<>(List.of(
                     "help", "menu", "chat", "home", "sethome", "claimland", "claimtoggle", "unclaim", "ally", "unally", "war", "truce",
                     "create", "invite", "accept", "leave", "kick", "promote", "newmaster", "title", "deny", "disband", "impeach",
-                    "bank", "deposit", "withdraw", "tax", "desc", "info", "power", "friendlyfire", "?", "1", "2"
+                    "bank", "deposit", "withdraw", "tax", "desc", "info", "power", "friendlyfire", "allyfire", "?", "1", "2"
             ));
             if (sender.hasPermission("magicera.admin")) {
                 subs.add("reload");
@@ -1462,7 +1510,7 @@ public final class GuildCommand implements TabExecutor {
             return filterPrefix(List.of("all"), input);
         }
 
-        if (sub.equals("friendlyfire") && args.length == 2) {
+        if ((sub.equals("friendlyfire") || sub.equals("allyfire")) && args.length == 2) {
             return filterPrefix(List.of("on", "off"), input);
         }
 
@@ -1571,6 +1619,7 @@ public final class GuildCommand implements TabExecutor {
             sender.sendMessage("§7/guild unclaim §8(or /guild unclaim all)");
             sender.sendMessage("§7/guild power");
             sender.sendMessage("§7/guild friendlyfire <on|off>");
+            sender.sendMessage("§7/guild allyfire <on|off>");
             sender.sendMessage("§7/guild ally <player|guild>");
             sender.sendMessage("§7/guild unally <player|guild>");
             sender.sendMessage("§7/guild war <player|guild>");
