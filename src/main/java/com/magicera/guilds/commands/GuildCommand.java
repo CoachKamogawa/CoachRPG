@@ -415,37 +415,7 @@ public final class GuildCommand implements TabExecutor {
         }
 
         if (sub.equals("truce")) {
-            if (!(sender instanceof Player player)) return true;
-            if (args.length < 2) {
-                sender.sendMessage("§cUsage: /guild truce <player|guild>");
-                return true;
-            }
-            Guild actor = guildOf(player.getUniqueId());
-            if (actor == null) {
-                sender.sendMessage("§cYou are not in a guild.");
-                return true;
-            }
-            if (actor.getMembers().get(player.getUniqueId()) != GuildRole.MASTER) {
-                sender.sendMessage("§cOnly the guild master can use this command.");
-                return true;
-            }
-            Guild target = resolveGuildTarget(args[1]);
-            if (target == null || target.getId().equals(actor.getId())) {
-                sender.sendMessage("§cInvalid target guild.");
-                return true;
-            }
-            if (!actor.getEnemies().contains(target.getId())) {
-                sender.sendMessage("§cYour guild is not at war with that guild.");
-                return true;
-            }
-            endWar(actor, target);
-            plugin.storage().save();
-            Bukkit.broadcastMessage("§7[§bMagic Era§7] "
-                    + Text.color(actor.getName())
-                    + " §fand "
-                    + Text.color(target.getName())
-                    + " §fhave ended their war with each other.");
-            return true;
+            return handleTruceCommand(sender, args);
         }
 
         if (sub.equals("ally")) {
@@ -1548,7 +1518,7 @@ public final class GuildCommand implements TabExecutor {
             return filterPrefix(guildIds, input);
         }
 
-        if ((sub.equals("war") || sub.equals("ally")) && args.length == 3 && args[1].equalsIgnoreCase("accept")) {
+        if ((sub.equals("war") || sub.equals("ally") || sub.equals("truce")) && args.length == 3 && args[1].equalsIgnoreCase("accept")) {
             List<String> guildIds = plugin.storage().allGuilds().stream().map(Guild::getId).sorted().collect(Collectors.toList());
             return filterPrefix(guildIds, input);
         }
@@ -1683,6 +1653,7 @@ public final class GuildCommand implements TabExecutor {
             sender.sendMessage("§7/guild war <player|guild>");
             sender.sendMessage("§7/guild war accept <guild>");
             sender.sendMessage("§7/guild truce <player|guild>");
+            sender.sendMessage("§7/guild truce accept <guild>");
             sender.sendMessage("§7/guild impeach §8(or /guild impeach <remove|keep>)");
         }
         if (role == GuildRole.MASTER) {
@@ -1841,11 +1812,8 @@ public final class GuildCommand implements TabExecutor {
 
         sender.sendMessage("§7[§aGuild§7] §fYou have requested an alliance with " + Text.color(target.getName()) + "§f!");
 
-        Player targetMaster = onlineGuildMaster(target);
-        if (targetMaster != null) {
-            targetMaster.sendMessage("§7[§bMagic Era§7] §e" + actor.getName() + " §fhas requested an alliance.");
-            targetMaster.sendMessage("§7Use §a/guild ally accept " + actor.getId() + " §7to accept.");
-        }
+        notifyGuildMaster(target, "§7[§bMagic Era§7] §e" + actor.getName() + " §fhas requested an alliance.");
+        notifyGuildMaster(target, "§7Use §a/guild ally accept " + actor.getId() + " §7to accept.");
 
         return true;
     }
@@ -1907,16 +1875,71 @@ public final class GuildCommand implements TabExecutor {
             plugin.storage().save();
             sender.sendMessage("§7[§aGuild§7] §fYou have formally requested war against " + Text.color(target.getName()) + "§f!");
 
-            Player targetMaster = onlineGuildMaster(target);
-            if (targetMaster != null) {
-                targetMaster.sendMessage("§7[§bMagic Era§7] §c" + actor.getName() + " §fhas requested war.");
-                targetMaster.sendMessage("§7Use §a/guild war accept " + actor.getId() + " §7to accept.");
-            }
+            notifyGuildMaster(target, "§7[§bMagic Era§7] §c" + actor.getName() + " §fhas requested war.");
+            notifyGuildMaster(target, "§7Use §a/guild war accept " + actor.getId() + " §7to accept.");
             return true;
         }
 
         declareWar(actor, target);
         plugin.storage().save();
+        return true;
+    }
+
+    private boolean handleTruceCommand(CommandSender sender, String[] args) {
+        if (!(sender instanceof Player player)) return true;
+
+        Guild actor = guildOf(player.getUniqueId());
+        if (actor == null) {
+            sender.sendMessage("§cYou are not in a guild.");
+            return true;
+        }
+        if (actor.getMembers().get(player.getUniqueId()) != GuildRole.MASTER) {
+            sender.sendMessage("§cOnly the guild master can use this command.");
+            return true;
+        }
+
+        if (args.length >= 3 && args[1].equalsIgnoreCase("accept")) {
+            Guild requester = resolveGuildTarget(args[2]);
+            if (requester == null || requester.getId().equals(actor.getId())) {
+                sender.sendMessage("§cInvalid target guild.");
+                return true;
+            }
+            if (!actor.getPendingTruceRequests().remove(requester.getId())) {
+                sender.sendMessage("§cNo pending truce request from that guild.");
+                return true;
+            }
+
+            requester.getPendingTruceRequests().remove(actor.getId());
+            endWar(requester, actor);
+            plugin.storage().save();
+            Bukkit.broadcastMessage("§7[§bMagic Era§7] "
+                    + Text.color(actor.getName())
+                    + " §fand "
+                    + Text.color(requester.getName())
+                    + " §fhave ended their war with each other.");
+            return true;
+        }
+
+        if (args.length < 2) {
+            sender.sendMessage("§cUsage: /guild truce <player|guild> or /guild truce accept <guild>");
+            return true;
+        }
+
+        Guild target = resolveGuildTarget(args[1]);
+        if (target == null || target.getId().equals(actor.getId())) {
+            sender.sendMessage("§cInvalid target guild.");
+            return true;
+        }
+        if (!actor.getEnemies().contains(target.getId())) {
+            sender.sendMessage("§cYour guild is not at war with that guild.");
+            return true;
+        }
+
+        target.getPendingTruceRequests().add(actor.getId());
+        plugin.storage().save();
+        sender.sendMessage("§7[§aGuild§7] §fYou have requested a truce with " + Text.color(target.getName()) + "§f!");
+        notifyGuildMaster(target, "§7[§bMagic Era§7] §e" + actor.getName() + " §fhas requested a truce.");
+        notifyGuildMaster(target, "§7Use §a/guild truce accept " + actor.getId() + " §7to accept.");
         return true;
     }
 
@@ -1939,6 +1962,8 @@ public final class GuildCommand implements TabExecutor {
             ally.setInWar(true);
             ally.setWarEndsAtEpochMs(warEnd);
         }
+
+        notifyGuildMaster(target, "§7[§bMagic Era§7] §cYour guild is now at war with " + Text.color(actor.getName()) + "§c.");
 
         Bukkit.broadcastMessage("§7[§bMagic Era§7] "
                 + Text.color(actor.getName())
@@ -1968,14 +1993,28 @@ public final class GuildCommand implements TabExecutor {
         return b.getAlignment() == GuildAlignment.HONORABLE || b.getAlignment() == GuildAlignment.NEUTRAL;
     }
 
-    private Player onlineGuildMaster(Guild guild) {
+    private UUID guildMasterId(Guild guild) {
         if (guild == null) return null;
         for (Map.Entry<UUID, GuildRole> e : guild.getMembers().entrySet()) {
             if (e.getValue() == GuildRole.MASTER) {
-                return Bukkit.getPlayer(e.getKey());
+                return e.getKey();
             }
         }
         return null;
+    }
+
+    private void notifyGuildMaster(Guild guild, String message) {
+        UUID masterId = guildMasterId(guild);
+        if (masterId == null || message == null || message.isBlank()) return;
+
+        Player online = Bukkit.getPlayer(masterId);
+        if (online != null) {
+            online.sendMessage(message);
+            return;
+        }
+
+        PlayerData masterData = plugin.storage().getOrCreatePlayer(masterId);
+        masterData.getPendingGuildMessages().add(message);
     }
 
     private String formatDuration(long millis) {
