@@ -147,16 +147,20 @@ public final class MenuListener implements Listener {
                             clicked.getItemMeta() == null ? "" : clicked.getItemMeta().getDisplayName()
                     );
 
-                    for (String allyId : g.getAllies()) {
-                        Guild ally = plugin.storage().getGuild(allyId);
-                        if (ally == null) continue;
+                    java.util.Set<String> relationIds = new java.util.HashSet<>();
+                    relationIds.addAll(g.getAllies());
+                    relationIds.addAll(g.getEnemies());
 
-                        String allyName = org.bukkit.ChatColor.stripColor(
-                                com.magicera.guilds.util.Text.color(ally.getName())
+                    for (String relationId : relationIds) {
+                        Guild relation = plugin.storage().getGuild(relationId);
+                        if (relation == null) continue;
+
+                        String relationName = org.bukkit.ChatColor.stripColor(
+                                com.magicera.guilds.util.Text.color(relation.getName())
                         );
 
-                        if (allyName != null && allyName.equalsIgnoreCase(stripped)) {
-                            player.openInventory(Menus.relationGuildMembersMenu(plugin, ally));
+                        if (relationName != null && relationName.equalsIgnoreCase(stripped)) {
+                            player.openInventory(Menus.relationGuildMembersMenu(plugin, relation));
                             break;
                         }
                     }
@@ -223,10 +227,18 @@ public final class MenuListener implements Listener {
             if (items == null) return counts;
             for (ItemStack it : items) {
                 if (it == null || it.getType().isAir()) continue;
-                String name = it.hasItemMeta() && it.getItemMeta() != null && it.getItemMeta().hasDisplayName()
+
+                String customName = it.hasItemMeta()
+                        && it.getItemMeta() != null
+                        && it.getItemMeta().hasDisplayName()
                         ? org.bukkit.ChatColor.stripColor(it.getItemMeta().getDisplayName())
-                        : it.getI18NDisplayName();
-                counts.merge(name, it.getAmount(), Integer::sum);
+                        : null;
+
+                String key = customName != null && !customName.isBlank()
+                        ? customName + " [" + it.getType().name() + "]"
+                        : it.getType().name();
+
+                counts.merge(key, it.getAmount(), Integer::sum);
             }
             return counts;
         }
