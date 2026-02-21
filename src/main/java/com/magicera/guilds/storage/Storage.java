@@ -104,6 +104,20 @@ public final class Storage {
                 guild.getPendingAllyRequests().addAll(s.getStringList("pendingAllyRequests"));
                 guild.getPendingWarRequests().addAll(s.getStringList("pendingWarRequests"));
 
+                // NEW: ally/war request cooldowns
+                ConfigurationSection allyCooldowns = s.getConfigurationSection("allyRequestCooldowns");
+                if (allyCooldowns != null) {
+                    for (String guildIdKey : allyCooldowns.getKeys(false)) {
+                        guild.getAllyRequestCooldowns().put(guildIdKey, allyCooldowns.getLong(guildIdKey, 0L));
+                    }
+                }
+                ConfigurationSection warCooldowns = s.getConfigurationSection("warRequestCooldowns");
+                if (warCooldowns != null) {
+                    for (String guildIdKey : warCooldowns.getKeys(false)) {
+                        guild.getWarRequestCooldowns().put(guildIdKey, warCooldowns.getLong(guildIdKey, 0L));
+                    }
+                }
+
                 List<String> logs = s.getStringList("logEntries");
                 if (logs != null && !logs.isEmpty()) {
                     guild.getLogEntries().addAll(logs);
@@ -219,6 +233,19 @@ public final class Storage {
             guildsYaml.set(base + ".enemies", new ArrayList<>(g.getEnemies()));
             guildsYaml.set(base + ".pendingAllyRequests", new ArrayList<>(g.getPendingAllyRequests()));
             guildsYaml.set(base + ".pendingWarRequests", new ArrayList<>(g.getPendingWarRequests()));
+
+            // NEW: ally/war request cooldowns
+            String allyCooldownBase = base + ".allyRequestCooldowns";
+            guildsYaml.set(allyCooldownBase, null);
+            for (Map.Entry<String, Long> e : g.getAllyRequestCooldowns().entrySet()) {
+                guildsYaml.set(allyCooldownBase + "." + e.getKey(), e.getValue());
+            }
+
+            String warCooldownBase = base + ".warRequestCooldowns";
+            guildsYaml.set(warCooldownBase, null);
+            for (Map.Entry<String, Long> e : g.getWarRequestCooldowns().entrySet()) {
+                guildsYaml.set(warCooldownBase + "." + e.getKey(), e.getValue());
+            }
 
             String memBase = base + ".members";
             guildsYaml.set(memBase, null);
