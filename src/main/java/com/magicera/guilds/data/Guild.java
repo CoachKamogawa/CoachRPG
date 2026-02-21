@@ -35,6 +35,11 @@ public final class Guild {
     private Integer homeZ;
 
     private boolean membersCanClaim;
+
+    // PvP controls
+    private boolean friendlyFireEnabled;
+    private boolean allyFireEnabled;
+
     private boolean inWar;
     private Long warEndsAtEpochMs;
 
@@ -70,6 +75,11 @@ public final class Guild {
         this.homeZ = null;
 
         this.membersCanClaim = false;
+
+        // defaults: safe by default
+        this.friendlyFireEnabled = false;
+        this.allyFireEnabled = false;
+
         this.inWar = false;
         this.warEndsAtEpochMs = null;
     }
@@ -86,7 +96,9 @@ public final class Guild {
     public void setTitle(String title) { this.title = title; }
 
     public String getDescription() { return description == null ? "" : description; }
-    public void setDescription(String description) { this.description = description == null ? "" : description; }
+    public void setDescription(String description) {
+        this.description = description == null ? "" : description;
+    }
 
     public long getFoundedAtEpochMs() { return foundedAtEpochMs; }
     public void setFoundedAtEpochMs(long foundedAtEpochMs) {
@@ -170,6 +182,20 @@ public final class Guild {
         this.membersCanClaim = membersCanClaim;
     }
 
+    // --- PvP controls ---
+
+    public boolean isFriendlyFireEnabled() { return friendlyFireEnabled; }
+    public void setFriendlyFireEnabled(boolean friendlyFireEnabled) {
+        this.friendlyFireEnabled = friendlyFireEnabled;
+    }
+
+    public boolean isAllyFireEnabled() { return allyFireEnabled; }
+    public void setAllyFireEnabled(boolean allyFireEnabled) {
+        this.allyFireEnabled = allyFireEnabled;
+    }
+
+    // --- War ---
+
     public boolean isInWar() { return inWar; }
     public void setInWar(boolean inWar) { this.inWar = inWar; }
 
@@ -177,6 +203,8 @@ public final class Guild {
     public void setWarEndsAtEpochMs(Long warEndsAtEpochMs) {
         this.warEndsAtEpochMs = warEndsAtEpochMs;
     }
+
+    // --- Territory / relations ---
 
     public Set<String> getClaimedChunks() { return claimedChunks; }
     public Set<String> getAllies() { return allies; }
