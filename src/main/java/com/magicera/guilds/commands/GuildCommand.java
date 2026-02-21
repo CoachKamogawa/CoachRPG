@@ -407,6 +407,10 @@ public final class GuildCommand implements TabExecutor {
                 sender.sendMessage("§cInvalid target guild.");
                 return true;
             }
+            if (isOpposingSideConflict(actor, target)) {
+                sender.sendMessage("§cYou cannot alter this treaty while your guilds are on opposing war sides.");
+                return true;
+            }
             actor.getAllies().remove(target.getId());
             target.getAllies().remove(actor.getId());
             plugin.storage().save();
@@ -1760,6 +1764,10 @@ public final class GuildCommand implements TabExecutor {
                 sender.sendMessage("§cNo pending ally request from that guild.");
                 return true;
             }
+            if (isOpposingSideConflict(actor, requester)) {
+                sender.sendMessage("§cYou cannot form an alliance while your guilds are on opposing war sides.");
+                return true;
+            }
 
             requester.getPendingAllyRequests().remove(actor.getId());
             actor.getAllies().add(requester.getId());
@@ -1791,6 +1799,10 @@ public final class GuildCommand implements TabExecutor {
 
         if (actor.getAllies().contains(target.getId())) {
             sender.sendMessage("§cYour guild is already allied with that guild.");
+            return true;
+        }
+        if (isOpposingSideConflict(actor, target)) {
+            sender.sendMessage("§cYou cannot request an alliance with a guild on an opposing war side.");
             return true;
         }
 
@@ -1908,6 +1920,10 @@ public final class GuildCommand implements TabExecutor {
                 sender.sendMessage("§cNo pending truce request from that guild.");
                 return true;
             }
+            if (hasCoalitionWarConflict(requester, actor)) {
+                sender.sendMessage("§cYou cannot sign this truce while allied guilds remain in active conflict.");
+                return true;
+            }
 
             requester.getPendingTruceRequests().remove(actor.getId());
             endWar(requester, actor);
@@ -1934,6 +1950,10 @@ public final class GuildCommand implements TabExecutor {
             sender.sendMessage("§cYour guild is not at war with that guild.");
             return true;
         }
+        if (hasCoalitionWarConflict(actor, target)) {
+            sender.sendMessage("§cYou cannot request a truce while allied guilds remain in active conflict.");
+            return true;
+        }
 
         target.getPendingTruceRequests().add(actor.getId());
         plugin.storage().save();
@@ -1954,14 +1974,17 @@ public final class GuildCommand implements TabExecutor {
         actor.setWarEndsAtEpochMs(warEnd);
         target.setWarEndsAtEpochMs(warEnd);
 
-        for (String allyId : new HashSet<>(actor.getAllies())) {
-            Guild ally = plugin.storage().getGuild(allyId);
-            if (ally == null || ally.getId().equals(target.getId())) continue;
-            ally.getEnemies().add(target.getId());
-            target.getEnemies().add(ally.getId());
-            ally.setInWar(true);
-            ally.setWarEndsAtEpochMs(warEnd);
-        }
+        Set<String> sideA = new HashSet<>();
+        Set<String> sideB = new HashSet<>();
+        sideA.add(actor.getId());
+        sideB.add(target.getId());
+
+        // server announcement for both anchor guilds entering war
+        announceWarEntry(actor, actor);
+        announceWarEntry(target, target);
+
+        callAlliesToWar(actor, target, actor, warEnd, sideA, sideB);
+        callAlliesToWar(target, actor, actor, warEnd, sideB, sideA);
 
         notifyGuildMaster(target, "§7[§bMagic Era§7] §cYour guild is now at war with " + Text.color(actor.getName()) + "§c.");
 
@@ -1970,6 +1993,113 @@ public final class GuildCommand implements TabExecutor {
                 + " §fhas declared war against "
                 + Text.color(target.getName())
                 + "§f!");
+    }
+
+    private void callAlliesToWar(Guild participant,
+                                 Guild opposingAnchor,
+                                 Guild declarationLeader,
+                                 long warEnd,
+                                 Set<String> joiningSide,
+                                 Set<String> opposingSide) {
+        for (String allyId : new HashSet<>(participant.getAllies())) {
+            Guild ally = plugin.storage().getGuild(allyId);
+            if (ally == null || ally.getId().equals(opposingAnchor.getId())) continue;
+
+            if (hasNonHostileTreatyWithSide(ally, opposingSide)) {
+                notifyGuild(ally,
+                        "§7[§aGuild§7] §fYou have an alliance with both sides. Your guild is Neutral in the war between "
+                                + Text.color(declarationLeader.getName())
+                                + "§f and "
+                                + Text.color(opposingAnchor.getName())
+                                + "§f.");
+                notifyGuild(participant,
+                        "§7[§aGuild§7] "
+                                + Text.color(ally.getName())
+                                + " §fwas not called to war due to an existing treaty with "
+                                + Text.color(opposingAnchor.getName())
+                                + "§f.");
+                continue;
+            }
+
+            boolean newJoin = joiningSide.add(ally.getId());
+            ally.setInWar(true);
+            ally.setWarEndsAtEpochMs(warEnd);
+            for (String enemyId : opposingSide) {
+                Guild enemy = plugin.storage().getGuild(enemyId);
+                if (enemy == null || enemy.getId().equals(ally.getId())) continue;
+                ally.getEnemies().add(enemy.getId());
+                enemy.getEnemies().add(ally.getId());
+            }
+
+            if (newJoin) {
+                announceWarEntry(ally, participant);
+            }
+        }
+    }
+
+    private boolean hasNonHostileTreatyWithSide(Guild guild, Set<String> opposingSide) {
+        for (String opposingId : opposingSide) {
+            if (guild.getId().equals(opposingId)) return true;
+            if (guild.getAllies().contains(opposingId)) return true;
+            Guild opposing = plugin.storage().getGuild(opposingId);
+            if (opposing != null && opposing.getAllies().contains(guild.getId())) return true;
+        }
+        return false;
+    }
+
+    private void announceWarEntry(Guild entrant, Guild sideLeader) {
+        Bukkit.broadcastMessage("§7[§aGuild§7] "
+                + Text.color(entrant.getName())
+                + " §fhas joined the war on the side of "
+                + Text.color(sideLeader.getName())
+                + "§f!");
+    }
+
+    private void notifyGuild(Guild guild, String message) {
+        if (guild == null || message == null || message.isBlank()) return;
+        for (UUID memberId : guild.getMembers().keySet()) {
+            Player online = Bukkit.getPlayer(memberId);
+            if (online != null) {
+                online.sendMessage(message);
+                continue;
+            }
+            PlayerData data = plugin.storage().getOrCreatePlayer(memberId);
+            data.getPendingGuildMessages().add(message);
+        }
+    }
+
+    private boolean isOpposingSideConflict(Guild a, Guild b) {
+        if (a == null || b == null) return false;
+        if (a.getEnemies().contains(b.getId()) || b.getEnemies().contains(a.getId())) return true;
+        for (String allyId : a.getAllies()) {
+            Guild ally = plugin.storage().getGuild(allyId);
+            if (ally != null && (ally.getEnemies().contains(b.getId()) || b.getEnemies().contains(ally.getId()))) {
+                return true;
+            }
+        }
+        for (String allyId : b.getAllies()) {
+            Guild ally = plugin.storage().getGuild(allyId);
+            if (ally != null && (ally.getEnemies().contains(a.getId()) || a.getEnemies().contains(ally.getId()))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean hasCoalitionWarConflict(Guild a, Guild b) {
+        for (String allyId : a.getAllies()) {
+            Guild ally = plugin.storage().getGuild(allyId);
+            if (ally != null && (ally.getEnemies().contains(b.getId()) || b.getEnemies().contains(ally.getId()))) {
+                return true;
+            }
+        }
+        for (String allyId : b.getAllies()) {
+            Guild ally = plugin.storage().getGuild(allyId);
+            if (ally != null && (ally.getEnemies().contains(a.getId()) || a.getEnemies().contains(ally.getId()))) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private void endWar(Guild a, Guild b) {
@@ -2037,6 +2167,7 @@ public final class GuildCommand implements TabExecutor {
     private static final class ParsedCreate {
         final String guildName;
         final String displayName;
+
         ParsedCreate(String guildName, String displayName) {
             this.guildName = guildName;
             this.displayName = displayName;
@@ -2096,7 +2227,8 @@ public final class GuildCommand implements TabExecutor {
         // UUID literal?
         try {
             return UUID.fromString(input);
-        } catch (IllegalArgumentException ignored) {}
+        } catch (IllegalArgumentException ignored) {
+        }
 
         Player online = findOnlinePlayerIgnoreCase(input);
         if (online != null) return online.getUniqueId();
