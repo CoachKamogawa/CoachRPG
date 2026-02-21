@@ -104,6 +104,9 @@ public final class Storage {
                 guild.getPendingAllyRequests().addAll(s.getStringList("pendingAllyRequests"));
                 guild.getPendingWarRequests().addAll(s.getStringList("pendingWarRequests"));
 
+                // NEW: pending truce requests
+                guild.getPendingTruceRequests().addAll(s.getStringList("pendingTruceRequests"));
+
                 // NEW: ally/war request cooldowns
                 ConfigurationSection allyCooldowns = s.getConfigurationSection("allyRequestCooldowns");
                 if (allyCooldowns != null) {
@@ -179,6 +182,9 @@ public final class Storage {
                     // NEW: offline tax notice accumulator
                     pd.setPendingTaxNoticeAmount(pSec.getDouble(uuidStr + ".pendingTaxNoticeAmount", 0.0));
 
+                    // NEW: pending guild messages
+                    pd.getPendingGuildMessages().addAll(pSec.getStringList(uuidStr + ".pendingGuildMessages"));
+
                     playersById.put(uuid, pd);
                 } catch (IllegalArgumentException ignored) {
                 }
@@ -237,6 +243,9 @@ public final class Storage {
             guildsYaml.set(base + ".pendingAllyRequests", new ArrayList<>(g.getPendingAllyRequests()));
             guildsYaml.set(base + ".pendingWarRequests", new ArrayList<>(g.getPendingWarRequests()));
 
+            // NEW: pending truce requests
+            guildsYaml.set(base + ".pendingTruceRequests", new ArrayList<>(g.getPendingTruceRequests()));
+
             // NEW: ally/war request cooldowns
             String allyCooldownBase = base + ".allyRequestCooldowns";
             guildsYaml.set(allyCooldownBase, null);
@@ -288,6 +297,9 @@ public final class Storage {
 
             // NEW: offline tax notice accumulator
             playersYaml.set(base + ".pendingTaxNoticeAmount", p.getPendingTaxNoticeAmount());
+
+            // NEW: pending guild messages
+            playersYaml.set(base + ".pendingGuildMessages", new ArrayList<>(p.getPendingGuildMessages()));
         }
 
         try {
