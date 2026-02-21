@@ -23,6 +23,7 @@ public final class Guild {
     private long officerWithdrawWindowStartMs;
 
     private Long masterOutOfFavorSinceEpochMs;
+    private Long masterOutOfFavorWarnEpochMs;
 
     // impeachment
     private Long impeachmentStartedEpochMs;
@@ -69,6 +70,8 @@ public final class Guild {
         this.officerWithdrawWindowStartMs = 0L;
 
         this.masterOutOfFavorSinceEpochMs = null;
+        this.masterOutOfFavorWarnEpochMs = null;
+
         this.impeachmentStartedEpochMs = null;
         this.kickLockUntilEpochMs = 0L;
 
@@ -150,6 +153,11 @@ public final class Guild {
     public Long getMasterOutOfFavorSinceEpochMs() { return masterOutOfFavorSinceEpochMs; }
     public void setMasterOutOfFavorSinceEpochMs(Long ms) {
         this.masterOutOfFavorSinceEpochMs = ms;
+    }
+
+    public Long getMasterOutOfFavorWarnEpochMs() { return masterOutOfFavorWarnEpochMs; }
+    public void setMasterOutOfFavorWarnEpochMs(Long ms) {
+        this.masterOutOfFavorWarnEpochMs = ms;
     }
 
     public Long getImpeachmentStartedEpochMs() { return impeachmentStartedEpochMs; }
