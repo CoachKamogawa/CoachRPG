@@ -1,0 +1,37 @@
+maxGuildMembers: 45
+playerPowerMax: 10.0
+playerPowerRegenPerHour: 3.33
+landCostPerChunk: 2.0
+territoryScaling:
+  3: 15
+  4: 17
+  5: 19
+  6: 21
+  7: 23
+  8: 24
+  9: 25
+  10: 26
+  11: 27
+  12: 28
+  13: 29
+  14: 29
+  15: 30
+  16: 31
+  20: 33
+  25: 35
+  30: 37
+  35: 38
+  40: 39
+  45: 40
+hallVulnerablePercentUnderOrEqual15: 0.15
+hallAtRiskPercentUnderOrEqual15: 0.20
+fixedThresholdMemberCount: 15
+warningTiers:
+  warWeariness50: true
+  critical25: true
+  collapse10: true
+  hallAtRisk: true
+  hallVulnerable: true
+  lowClaims: true
+lowClaimsThreshold: 3
+warningCooldownMinutes: 10
