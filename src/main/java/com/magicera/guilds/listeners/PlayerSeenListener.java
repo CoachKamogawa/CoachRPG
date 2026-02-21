@@ -14,7 +14,7 @@ import java.util.Locale;
 
 public final class PlayerSeenListener implements Listener {
 
-    private static final long OFFLINE_MESSAGE_DELAY_TICKS = 40L;
+    private static final long OFFLINE_MESSAGE_DELAY_TICKS = 20L;
 
     private final MagicEraGuildsPlugin plugin;
 
