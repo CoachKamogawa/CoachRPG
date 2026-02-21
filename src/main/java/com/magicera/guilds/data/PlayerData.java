@@ -30,7 +30,7 @@ public final class PlayerData {
         this.guildTitle = "";
         this.lastSeenEpochMs = System.currentTimeMillis();
         this.guildChatEnabled = false;
-        this.power = 15.0;
+        this.power = 10.0;
         this.pendingTaxNoticeAmount = 0.0;
         this.pendingGuildMessages = new ArrayList<>();
     }
@@ -60,7 +60,7 @@ public final class PlayerData {
 
     public double getPower() { return power; }
     public void setPower(double power) {
-        this.power = Math.max(0.0, power);
+        this.power = Math.max(0.0, Math.min(10.0, power));
     }
 
     public double getPendingTaxNoticeAmount() { return pendingTaxNoticeAmount; }
