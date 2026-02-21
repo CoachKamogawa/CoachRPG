@@ -5,9 +5,10 @@ import java.util.UUID;
 public final class PlayerData {
     private final UUID uuid;
 
-    private String guildId;                  // nullable
-    private int alignmentScore;              // -100..100
-    private Long outOfAlignmentSinceEpochMs; // nullable (epoch ms)
+    private String guildId;                      // nullable
+    private int alignmentScore;                  // -100..100
+    private Long outOfAlignmentSinceEpochMs;     // nullable (epoch ms)
+    private Long lastOutOfAlignmentWarnEpochMs;  // nullable (epoch ms)
 
     // NEW:
     private String guildTitle;               // nullable / empty ok
@@ -20,6 +21,7 @@ public final class PlayerData {
         this.uuid = uuid;
         this.alignmentScore = 0;
         this.outOfAlignmentSinceEpochMs = null;
+        this.lastOutOfAlignmentWarnEpochMs = null;
         this.guildTitle = "";
         this.lastSeenEpochMs = System.currentTimeMillis();
         this.guildChatEnabled = false;
@@ -37,6 +39,9 @@ public final class PlayerData {
 
     public Long getOutOfAlignmentSinceEpochMs() { return outOfAlignmentSinceEpochMs; }
     public void setOutOfAlignmentSinceEpochMs(Long v) { this.outOfAlignmentSinceEpochMs = v; }
+
+    public Long getLastOutOfAlignmentWarnEpochMs() { return lastOutOfAlignmentWarnEpochMs; }
+    public void setLastOutOfAlignmentWarnEpochMs(Long v) { this.lastOutOfAlignmentWarnEpochMs = v; }
 
     public String getGuildTitle() { return guildTitle == null ? "" : guildTitle; }
     public void setGuildTitle(String guildTitle) { this.guildTitle = guildTitle; }
