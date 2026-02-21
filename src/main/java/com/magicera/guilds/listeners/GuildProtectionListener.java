@@ -76,7 +76,7 @@ public final class GuildProtectionListener implements Listener {
         if (!(event.getEntity() instanceof Player victim)) return;
         Player attacker = asPlayerDamager(event.getDamager());
         if (attacker == null) return;
-        if (isFriendly(attacker, victim)) {
+        if (shouldBlockFriendlyFire(attacker, victim)) {
             event.setCancelled(true);
         }
     }
@@ -86,7 +86,7 @@ public final class GuildProtectionListener implements Listener {
         if (!(event.getEntity() instanceof Player victim)) return;
         Player attacker = asPlayerDamager(event.getCombuster());
         if (attacker == null) return;
-        if (isFriendly(attacker, victim)) {
+        if (shouldBlockFriendlyFire(attacker, victim)) {
             event.setCancelled(true);
         }
     }
@@ -98,6 +98,7 @@ public final class GuildProtectionListener implements Listener {
         if (caster.getUniqueId().equals(victim.getUniqueId())) return;
 
         if (!isFriendly(caster, victim)) return;
+        if (!shouldBlockFriendlyFire(caster, victim)) return;
 
         String internalName = event.getSpell().getInternalName().toLowerCase();
         boolean positive = internalName.contains("heal") || internalName.contains("buff") || internalName.contains("regen");
@@ -121,7 +122,15 @@ public final class GuildProtectionListener implements Listener {
         if (prev.equals(ownerId)) return;
 
         lastShownClaim.put(player.getUniqueId(), ownerId);
-        if (owner == null) return;
+        if (owner == null) {
+            if (!prev.isEmpty()) {
+                Guild previousOwner = plugin.storage().getGuild(prev);
+                if (previousOwner != null) {
+                    player.sendTitle("§fLeaving the territory of " + previousOwner.getName(), "", 5, 40, 10);
+                }
+            }
+            return;
+        }
 
         String sub = owner.getDescription().isEmpty()
                 ? "§7No description set."
@@ -149,6 +158,13 @@ public final class GuildProtectionListener implements Listener {
         if (entity instanceof Player p) return p;
         if (entity instanceof Projectile proj && proj.getShooter() instanceof Player p) return p;
         return null;
+    }
+
+    private boolean shouldBlockFriendlyFire(Player a, Player b) {
+        if (!isFriendly(a, b)) return false;
+        PlayerData ap = plugin.storage().getOrCreatePlayer(a.getUniqueId());
+        PlayerData bp = plugin.storage().getOrCreatePlayer(b.getUniqueId());
+        return ap.isFriendlyFireProtection() || bp.isFriendlyFireProtection();
     }
 
     private boolean isFriendly(Player a, Player b) {
