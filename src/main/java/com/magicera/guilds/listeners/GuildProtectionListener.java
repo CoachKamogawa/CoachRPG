@@ -97,7 +97,7 @@ public final class GuildProtectionListener implements Listener {
         if (!(event.getSpellData().caster() instanceof Player caster)) return;
         if (caster.getUniqueId().equals(victim.getUniqueId())) return;
 
-        if (!isFriendly(caster, victim)) return;
+        // Only block harmful spells when the relationship + toggles say so.
         if (!shouldBlockFriendlyFire(caster, victim)) return;
 
         String internalName = event.getSpell().getInternalName().toLowerCase();
@@ -161,10 +161,25 @@ public final class GuildProtectionListener implements Listener {
     }
 
     private boolean shouldBlockFriendlyFire(Player a, Player b) {
-        if (!isFriendly(a, b)) return false;
         PlayerData ap = plugin.storage().getOrCreatePlayer(a.getUniqueId());
         PlayerData bp = plugin.storage().getOrCreatePlayer(b.getUniqueId());
-        return ap.isFriendlyFireProtection() || bp.isFriendlyFireProtection();
+        if (ap.getGuildId() == null || bp.getGuildId() == null) return false;
+
+        Guild ag = plugin.storage().getGuild(ap.getGuildId());
+        Guild bg = plugin.storage().getGuild(bp.getGuildId());
+        if (ag == null || bg == null) return false;
+
+        // Same guild: blocked unless that guild explicitly enables friendly fire.
+        if (ag.getId().equals(bg.getId())) {
+            return !ag.isFriendlyFireEnabled();
+        }
+
+        // Allies: only considered "friendly" if either side has the other listed.
+        boolean allied = ag.getAllies().contains(bg.getId()) || bg.getAllies().contains(ag.getId());
+        if (!allied) return false;
+
+        // Both guilds must opt in for allied PvP and harmful spells.
+        return !(ag.isAllyFireEnabled() && bg.isAllyFireEnabled());
     }
 
     private boolean isFriendly(Player a, Player b) {
@@ -174,6 +189,7 @@ public final class GuildProtectionListener implements Listener {
         if (ap.getGuildId().equals(bp.getGuildId())) return true;
 
         Guild ag = plugin.storage().getGuild(ap.getGuildId());
-        return ag != null && ag.getAllies().contains(bp.getGuildId());
+        Guild bg = plugin.storage().getGuild(bp.getGuildId());
+        return ag != null && bg != null && (ag.getAllies().contains(bg.getId()) || bg.getAllies().contains(ag.getId()));
     }
 }
