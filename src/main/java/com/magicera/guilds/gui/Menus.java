@@ -76,7 +76,7 @@ public final class Menus {
         return inv;
     }
 
-    public static Inventory yourGuildMenu(Guild g) {
+    public static Inventory yourGuildMenu(MagicEraGuildsPlugin plugin, Guild g) {
         Inventory inv = Bukkit.createInventory(null, 27, TITLE_YOUR_GUILD);
 
         for (int i = 0; i < 9; i++) inv.setItem(i, backPane());
@@ -90,14 +90,12 @@ public final class Menus {
 
         // Moved Guild Info to slot 22 (and expanded lore)
         inv.setItem(22, item(Material.BOOK, "§bGuild Info", lore(
-                "§7View guild details in chat.",
+                "§7Click to view more details in chat",
                 "",
-                "§7Name: §r" + Text.color(g.getName()),
-                "§7Tag: §7[" + g.getPrefix() + "§7]",
-                "§7Favor: §f" + AlignmentUtil.displayName(g.getAlignment()),
+                "§7Guild: §r" + Text.color(g.getName()),
                 "§7Type: §f" + AlignmentUtil.guildTypeName(g.getAlignment()),
-                "",
-                "§eClick to view"
+                "§7Tax Rate: §f" + g.getTaxPercent() + "%",
+                "§7Total Power: §f" + String.format(Locale.US, "%.2f", guildPower(plugin, g))
         )));
 
         return inv;
@@ -297,8 +295,8 @@ public final class Menus {
         int[] right = new int[]{23, 24, 25, 26};
 
         // default light gray with side labels on hover
-        for (int s : left) inv.setItem(s, item(Material.LIGHT_GRAY_STAINED_GLASS_PANE, " ", lore("§c§lSin")));
-        for (int s : right) inv.setItem(s, item(Material.LIGHT_GRAY_STAINED_GLASS_PANE, " ", lore("§a§lHonor")));
+        for (int s : left) inv.setItem(s, item(Material.LIGHT_GRAY_STAINED_GLASS_PANE, "§cSin", null));
+        for (int s : right) inv.setItem(s, item(Material.LIGHT_GRAY_STAINED_GLASS_PANE, "§aHonor", null));
 
         // player head hover shows score + status
         inv.setItem(headSlot, playerHead(viewer, "§bYou", lore(
@@ -311,11 +309,11 @@ public final class Menus {
         // Honor: all lime
         // Balance: fill proportionally on one side only
         if (favor == GuildAlignment.DARK) {
-            for (int s : left) inv.setItem(s, item(Material.RED_STAINED_GLASS_PANE, " ", lore("§c§lSin")));
-            for (int s : right) inv.setItem(s, item(Material.RED_STAINED_GLASS_PANE, " ", lore("§a§lHonor")));
+            for (int s : left) inv.setItem(s, item(Material.RED_STAINED_GLASS_PANE, "§cSin", null));
+            for (int s : right) inv.setItem(s, item(Material.RED_STAINED_GLASS_PANE, "§aHonor", null));
         } else if (favor == GuildAlignment.HONORABLE) {
-            for (int s : left) inv.setItem(s, item(Material.LIME_STAINED_GLASS_PANE, " ", lore("§c§lSin")));
-            for (int s : right) inv.setItem(s, item(Material.LIME_STAINED_GLASS_PANE, " ", lore("§a§lHonor")));
+            for (int s : left) inv.setItem(s, item(Material.LIME_STAINED_GLASS_PANE, "§cSin", null));
+            for (int s : right) inv.setItem(s, item(Material.LIME_STAINED_GLASS_PANE, "§aHonor", null));
         } else {
             int steps = 4;
 
@@ -323,7 +321,7 @@ public final class Menus {
                 int fill = (int) Math.ceil((Math.min(100, score) / 100.0) * steps);
                 fill = Math.max(0, Math.min(steps, fill));
                 for (int i = 0; i < fill; i++) {
-                    inv.setItem(right[i], item(Material.LIME_STAINED_GLASS_PANE, " ", lore("§a§lHonor")));
+                    inv.setItem(right[i], item(Material.LIME_STAINED_GLASS_PANE, "§aHonor", null));
                 }
             } else if (score < 0) {
                 int abs = Math.abs(score);
@@ -331,7 +329,7 @@ public final class Menus {
                 fill = Math.max(0, Math.min(steps, fill));
                 int[] leftNearCenterFirst = new int[]{21, 20, 19, 18};
                 for (int i = 0; i < fill; i++) {
-                    inv.setItem(leftNearCenterFirst[i], item(Material.RED_STAINED_GLASS_PANE, " ", lore("§c§lSin")));
+                    inv.setItem(leftNearCenterFirst[i], item(Material.RED_STAINED_GLASS_PANE, "§cSin", null));
                 }
             }
         }
