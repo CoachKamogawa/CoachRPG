@@ -66,7 +66,7 @@ public final class Storage {
                 Guild guild = new Guild(guildId, name, prefix, alignment);
                 guild.setTitle(title);
 
-                // NEW: description + founded timestamp
+                // description + founded timestamp
                 guild.setDescription(s.getString("description", ""));
                 guild.setFoundedAtEpochMs(s.getLong("foundedAtEpochMs", System.currentTimeMillis()));
 
@@ -101,16 +101,31 @@ public final class Storage {
                 long warEnds = s.getLong("warEndsAtEpochMs", 0L);
                 guild.setWarEndsAtEpochMs(warEnds == 0L ? null : warEnds);
 
+                long warSessionId = s.getLong("warSessionId", 0L);
+                guild.setWarSessionId(warSessionId == 0L ? null : warSessionId);
+
                 guild.getClaimedChunks().addAll(s.getStringList("claimedChunks"));
+                guild.getUnstableClaims().addAll(s.getStringList("unstableClaims"));
+
+                String hallWorld = s.getString("hall.world");
+                if (hallWorld != null && s.contains("hall.centerX") && s.contains("hall.centerZ")) {
+                    guild.setHall(
+                            hallWorld,
+                            s.getInt("hall.centerX"),
+                            s.getInt("hall.centerZ"),
+                            s.getStringList("hall.chunks")
+                    );
+                }
+
                 guild.getAllies().addAll(s.getStringList("allies"));
                 guild.getEnemies().addAll(s.getStringList("enemies"));
                 guild.getPendingAllyRequests().addAll(s.getStringList("pendingAllyRequests"));
                 guild.getPendingWarRequests().addAll(s.getStringList("pendingWarRequests"));
 
-                // NEW: pending truce requests
+                // pending truce requests
                 guild.getPendingTruceRequests().addAll(s.getStringList("pendingTruceRequests"));
 
-                // NEW: ally/war request cooldowns
+                // ally/war request cooldowns
                 ConfigurationSection allyCooldowns = s.getConfigurationSection("allyRequestCooldowns");
                 if (allyCooldowns != null) {
                     for (String guildIdKey : allyCooldowns.getKeys(false)) {
@@ -123,6 +138,14 @@ public final class Storage {
                         guild.getWarRequestCooldowns().put(guildIdKey, warCooldowns.getLong(guildIdKey, 0L));
                     }
                 }
+
+                ConfigurationSection warningLastSent = s.getConfigurationSection("warningLastSent");
+                if (warningLastSent != null) {
+                    for (String tier : warningLastSent.getKeys(false)) {
+                        guild.getWarningLastSent().put(tier, warningLastSent.getLong(tier, 0L));
+                    }
+                }
+                guild.getWarningSentWarSession().addAll(s.getStringList("warningSentWarSession"));
 
                 List<String> logs = s.getStringList("logEntries");
                 if (logs != null && !logs.isEmpty()) {
@@ -180,12 +203,12 @@ public final class Storage {
                     pd.setGuildTitle(pSec.getString(uuidStr + ".guildTitle", ""));
                     pd.setLastSeenEpochMs(pSec.getLong(uuidStr + ".lastSeenEpochMs", System.currentTimeMillis()));
                     pd.setGuildChatEnabled(pSec.getBoolean(uuidStr + ".guildChatEnabled", false));
-                    pd.setPower(pSec.getDouble(uuidStr + ".power", 15.0));
+                    pd.setPower(pSec.getDouble(uuidStr + ".power", 10.0));
 
-                    // NEW: offline tax notice accumulator
+                    // offline tax notice accumulator
                     pd.setPendingTaxNoticeAmount(pSec.getDouble(uuidStr + ".pendingTaxNoticeAmount", 0.0));
 
-                    // NEW: pending guild messages
+                    // pending guild messages
                     pd.getPendingGuildMessages().addAll(pSec.getStringList(uuidStr + ".pendingGuildMessages"));
 
                     playersById.put(uuid, pd);
@@ -209,7 +232,7 @@ public final class Storage {
             guildsYaml.set(base + ".prefix", g.getPrefix());
             guildsYaml.set(base + ".title", g.getTitle());
 
-            // NEW: description + founded timestamp
+            // description + founded timestamp
             guildsYaml.set(base + ".description", g.getDescription());
             guildsYaml.set(base + ".foundedAtEpochMs", g.getFoundedAtEpochMs());
 
@@ -244,16 +267,25 @@ public final class Storage {
 
             guildsYaml.set(base + ".inWar", g.isInWar());
             guildsYaml.set(base + ".warEndsAtEpochMs", g.getWarEndsAtEpochMs() == null ? 0L : g.getWarEndsAtEpochMs());
+            guildsYaml.set(base + ".warSessionId", g.getWarSessionId() == null ? 0L : g.getWarSessionId());
+
             guildsYaml.set(base + ".claimedChunks", new ArrayList<>(g.getClaimedChunks()));
+            guildsYaml.set(base + ".unstableClaims", new ArrayList<>(g.getUnstableClaims()));
+
+            guildsYaml.set(base + ".hall.world", g.getHallWorld());
+            guildsYaml.set(base + ".hall.centerX", g.getHallCenterX());
+            guildsYaml.set(base + ".hall.centerZ", g.getHallCenterZ());
+            guildsYaml.set(base + ".hall.chunks", new ArrayList<>(g.getHallChunks()));
+
             guildsYaml.set(base + ".allies", new ArrayList<>(g.getAllies()));
             guildsYaml.set(base + ".enemies", new ArrayList<>(g.getEnemies()));
             guildsYaml.set(base + ".pendingAllyRequests", new ArrayList<>(g.getPendingAllyRequests()));
             guildsYaml.set(base + ".pendingWarRequests", new ArrayList<>(g.getPendingWarRequests()));
 
-            // NEW: pending truce requests
+            // pending truce requests
             guildsYaml.set(base + ".pendingTruceRequests", new ArrayList<>(g.getPendingTruceRequests()));
 
-            // NEW: ally/war request cooldowns
+            // ally/war request cooldowns
             String allyCooldownBase = base + ".allyRequestCooldowns";
             guildsYaml.set(allyCooldownBase, null);
             for (Map.Entry<String, Long> e : g.getAllyRequestCooldowns().entrySet()) {
@@ -265,6 +297,13 @@ public final class Storage {
             for (Map.Entry<String, Long> e : g.getWarRequestCooldowns().entrySet()) {
                 guildsYaml.set(warCooldownBase + "." + e.getKey(), e.getValue());
             }
+
+            String warningLastSentBase = base + ".warningLastSent";
+            guildsYaml.set(warningLastSentBase, null);
+            for (Map.Entry<String, Long> e : g.getWarningLastSent().entrySet()) {
+                guildsYaml.set(warningLastSentBase + "." + e.getKey(), e.getValue());
+            }
+            guildsYaml.set(base + ".warningSentWarSession", new ArrayList<>(g.getWarningSentWarSession()));
 
             String memBase = base + ".members";
             guildsYaml.set(memBase, null);
@@ -302,10 +341,10 @@ public final class Storage {
             playersYaml.set(base + ".guildChatEnabled", p.isGuildChatEnabled());
             playersYaml.set(base + ".power", p.getPower());
 
-            // NEW: offline tax notice accumulator
+            // offline tax notice accumulator
             playersYaml.set(base + ".pendingTaxNoticeAmount", p.getPendingTaxNoticeAmount());
 
-            // NEW: pending guild messages
+            // pending guild messages
             playersYaml.set(base + ".pendingGuildMessages", new ArrayList<>(p.getPendingGuildMessages()));
         }
 
@@ -356,7 +395,6 @@ public final class Storage {
         Guild g = new Guild(id, name, prefix, GuildAlignment.NEUTRAL);
         g.setRole(masterUuid, GuildRole.MASTER);
 
-        // NEW: initialize these on creation
         g.setDescription("");
         g.setFoundedAtEpochMs(System.currentTimeMillis());
 
