@@ -168,6 +168,9 @@ public final class Storage {
                     long since = pSec.getLong(uuidStr + ".outOfAlignmentSinceEpochMs", 0L);
                     pd.setOutOfAlignmentSinceEpochMs(since == 0L ? null : since);
 
+                    long lastWarn = pSec.getLong(uuidStr + ".lastOutOfAlignmentWarnEpochMs", 0L);
+                    pd.setLastOutOfAlignmentWarnEpochMs(lastWarn == 0L ? null : lastWarn);
+
                     pd.setGuildTitle(pSec.getString(uuidStr + ".guildTitle", ""));
                     pd.setLastSeenEpochMs(pSec.getLong(uuidStr + ".lastSeenEpochMs", System.currentTimeMillis()));
                     pd.setGuildChatEnabled(pSec.getBoolean(uuidStr + ".guildChatEnabled", false));
@@ -274,6 +277,9 @@ public final class Storage {
 
             Long since = p.getOutOfAlignmentSinceEpochMs();
             playersYaml.set(base + ".outOfAlignmentSinceEpochMs", since == null ? 0L : since);
+
+            Long lastWarn = p.getLastOutOfAlignmentWarnEpochMs();
+            playersYaml.set(base + ".lastOutOfAlignmentWarnEpochMs", lastWarn == null ? 0L : lastWarn);
 
             playersYaml.set(base + ".guildTitle", p.getGuildTitle());
             playersYaml.set(base + ".lastSeenEpochMs", p.getLastSeenEpochMs());
