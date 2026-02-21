@@ -1,6 +1,8 @@
 package com.magicera.guilds.data;
 
 import java.util.UUID;
+import java.util.ArrayList;
+import java.util.List;
 
 public final class PlayerData {
     private final UUID uuid;
@@ -10,12 +12,15 @@ public final class PlayerData {
     private Long outOfAlignmentSinceEpochMs;     // nullable (epoch ms)
     private Long lastOutOfAlignmentWarnEpochMs;  // nullable (epoch ms)
 
-    // NEW:
+    // Guild / activity
     private String guildTitle;               // nullable / empty ok
     private long lastSeenEpochMs;            // epoch ms (updated on quit, and on join init)
     private boolean guildChatEnabled;
     private double power;
     private double pendingTaxNoticeAmount;
+
+    // Offline guild chat / notifications
+    private final List<String> pendingGuildMessages;
 
     public PlayerData(UUID uuid) {
         this.uuid = uuid;
@@ -27,6 +32,7 @@ public final class PlayerData {
         this.guildChatEnabled = false;
         this.power = 15.0;
         this.pendingTaxNoticeAmount = 0.0;
+        this.pendingGuildMessages = new ArrayList<>();
     }
 
     public UUID getUuid() { return uuid; }
@@ -61,4 +67,6 @@ public final class PlayerData {
     public void setPendingTaxNoticeAmount(double pendingTaxNoticeAmount) {
         this.pendingTaxNoticeAmount = Math.max(0.0, pendingTaxNoticeAmount);
     }
+
+    public List<String> getPendingGuildMessages() { return pendingGuildMessages; }
 }
