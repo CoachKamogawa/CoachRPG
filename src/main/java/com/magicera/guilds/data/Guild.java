@@ -50,6 +50,7 @@ public final class Guild {
     // pending relationship requests
     private final Set<String> pendingAllyRequests = new HashSet<>();
     private final Set<String> pendingWarRequests = new HashSet<>();
+    private final Set<String> pendingTruceRequests = new HashSet<>();
     private final Map<String, Long> allyRequestCooldowns = new HashMap<>();
     private final Map<String, Long> warRequestCooldowns = new HashMap<>();
 
@@ -214,6 +215,7 @@ public final class Guild {
 
     public Set<String> getPendingAllyRequests() { return pendingAllyRequests; }
     public Set<String> getPendingWarRequests() { return pendingWarRequests; }
+    public Set<String> getPendingTruceRequests() { return pendingTruceRequests; }
     public Map<String, Long> getAllyRequestCooldowns() { return allyRequestCooldowns; }
     public Map<String, Long> getWarRequestCooldowns() { return warRequestCooldowns; }
 
