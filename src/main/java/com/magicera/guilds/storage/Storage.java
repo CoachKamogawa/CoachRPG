@@ -98,6 +98,8 @@ public final class Storage {
                 guild.getClaimedChunks().addAll(s.getStringList("claimedChunks"));
                 guild.getAllies().addAll(s.getStringList("allies"));
                 guild.getEnemies().addAll(s.getStringList("enemies"));
+                guild.getPendingAllyRequests().addAll(s.getStringList("pendingAllyRequests"));
+                guild.getPendingWarRequests().addAll(s.getStringList("pendingWarRequests"));
 
                 List<String> logs = s.getStringList("logEntries");
                 if (logs != null && !logs.isEmpty()) {
@@ -156,6 +158,7 @@ public final class Storage {
 
                     // NEW: offline tax notice accumulator
                     pd.setPendingTaxNoticeAmount(pSec.getDouble(uuidStr + ".pendingTaxNoticeAmount", 0.0));
+                    pd.setFriendlyFireProtection(pSec.getBoolean(uuidStr + ".friendlyFireProtection", true));
 
                     playersById.put(uuid, pd);
                 } catch (IllegalArgumentException ignored) {
@@ -209,6 +212,8 @@ public final class Storage {
             guildsYaml.set(base + ".claimedChunks", new ArrayList<>(g.getClaimedChunks()));
             guildsYaml.set(base + ".allies", new ArrayList<>(g.getAllies()));
             guildsYaml.set(base + ".enemies", new ArrayList<>(g.getEnemies()));
+            guildsYaml.set(base + ".pendingAllyRequests", new ArrayList<>(g.getPendingAllyRequests()));
+            guildsYaml.set(base + ".pendingWarRequests", new ArrayList<>(g.getPendingWarRequests()));
 
             String memBase = base + ".members";
             guildsYaml.set(memBase, null);
@@ -245,6 +250,7 @@ public final class Storage {
 
             // NEW: offline tax notice accumulator
             playersYaml.set(base + ".pendingTaxNoticeAmount", p.getPendingTaxNoticeAmount());
+            playersYaml.set(base + ".friendlyFireProtection", p.isFriendlyFireProtection());
         }
 
         try {
