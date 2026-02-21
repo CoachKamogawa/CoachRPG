@@ -43,8 +43,17 @@ public final class Guild {
 
     private boolean inWar;
     private Long warEndsAtEpochMs;
+    private Long warSessionId;
 
     private final Set<String> claimedChunks = new HashSet<>();
+    private final Set<String> unstableClaims = new HashSet<>();
+
+    // Guild hall / hall territory metadata
+    private String hallWorld;
+    private Integer hallCenterX;
+    private Integer hallCenterZ;
+    private final Set<String> hallChunks = new HashSet<>();
+
     private final Set<String> allies = new HashSet<>();
     private final Set<String> enemies = new HashSet<>();
 
@@ -54,6 +63,10 @@ public final class Guild {
     private final Set<String> pendingTruceRequests = new HashSet<>();
     private final Map<String, Long> allyRequestCooldowns = new HashMap<>();
     private final Map<String, Long> warRequestCooldowns = new HashMap<>();
+
+    // warning tracking (rate limit + per-war-session)
+    private final Map<String, Long> warningLastSent = new HashMap<>();
+    private final Set<String> warningSentWarSession = new HashSet<>();
 
     public Guild(String id, String name, String prefix, GuildAlignment alignment) {
         this.id = id;
@@ -88,6 +101,11 @@ public final class Guild {
 
         this.inWar = false;
         this.warEndsAtEpochMs = null;
+        this.warSessionId = null;
+
+        this.hallWorld = null;
+        this.hallCenterX = null;
+        this.hallCenterZ = null;
     }
 
     public String getId() { return id; }
@@ -215,9 +233,19 @@ public final class Guild {
         this.warEndsAtEpochMs = warEndsAtEpochMs;
     }
 
+    public Long getWarSessionId() { return warSessionId; }
+    public void setWarSessionId(Long warSessionId) { this.warSessionId = warSessionId; }
+
     // --- Territory / relations ---
 
     public Set<String> getClaimedChunks() { return claimedChunks; }
+    public Set<String> getUnstableClaims() { return unstableClaims; }
+
+    public String getHallWorld() { return hallWorld; }
+    public Integer getHallCenterX() { return hallCenterX; }
+    public Integer getHallCenterZ() { return hallCenterZ; }
+    public Set<String> getHallChunks() { return hallChunks; }
+
     public Set<String> getAllies() { return allies; }
     public Set<String> getEnemies() { return enemies; }
 
@@ -226,6 +254,24 @@ public final class Guild {
     public Set<String> getPendingTruceRequests() { return pendingTruceRequests; }
     public Map<String, Long> getAllyRequestCooldowns() { return allyRequestCooldowns; }
     public Map<String, Long> getWarRequestCooldowns() { return warRequestCooldowns; }
+
+    public Map<String, Long> getWarningLastSent() { return warningLastSent; }
+    public Set<String> getWarningSentWarSession() { return warningSentWarSession; }
+
+    public void setHall(String world, int centerX, int centerZ, Collection<String> chunks) {
+        this.hallWorld = world;
+        this.hallCenterX = centerX;
+        this.hallCenterZ = centerZ;
+        this.hallChunks.clear();
+        if (chunks != null) this.hallChunks.addAll(chunks);
+    }
+
+    public void clearHall() {
+        this.hallWorld = null;
+        this.hallCenterX = null;
+        this.hallCenterZ = null;
+        this.hallChunks.clear();
+    }
 
     public static String chunkKey(String world, int x, int z) {
         return world + ":" + x + ":" + z;
