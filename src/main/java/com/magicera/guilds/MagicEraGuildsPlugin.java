@@ -10,6 +10,7 @@ import com.magicera.guilds.econ.EconomyHook;
 import com.magicera.guilds.gui.MenuListener;
 import com.magicera.guilds.guilds.GuildMaintenanceTask;
 import com.magicera.guilds.guilds.InviteManager;
+import com.magicera.guilds.guilds.VaultLogManager;
 import com.magicera.guilds.guilds.VaultManager;
 import com.magicera.guilds.listeners.GuildChatListener;
 import com.magicera.guilds.listeners.GuildProtectionListener;
@@ -33,6 +34,7 @@ public final class MagicEraGuildsPlugin extends JavaPlugin {
     private AlignmentWatcher alignmentWatcher;
     private InviteManager inviteManager;
     private VaultManager vaults;
+    private VaultLogManager vaultLogs;
 
     private EconomyHook economyHook;
     private long nextGuildTaxEpochMs;
@@ -41,6 +43,7 @@ public final class MagicEraGuildsPlugin extends JavaPlugin {
     public AlignmentWatcher alignmentWatcher() { return alignmentWatcher; }
     public InviteManager inviteManager() { return inviteManager; }
     public VaultManager vaults() { return vaults; }
+    public VaultLogManager vaultLogs() { return vaultLogs; }
     public EconomyHook economy() { return economyHook; }
     public long nextGuildTaxEpochMs() { return nextGuildTaxEpochMs; }
 
@@ -54,6 +57,7 @@ public final class MagicEraGuildsPlugin extends JavaPlugin {
 
             inviteManager = new InviteManager(this);
             vaults = new VaultManager(this);
+            vaultLogs = new VaultLogManager(this);
 
             economyHook = new EconomyHook();
             boolean econOk = economyHook.setup();
