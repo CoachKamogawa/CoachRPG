@@ -183,10 +183,7 @@ public final class MenuListener implements Listener {
         }
 
         plugin.vaults().saveVault(g.getId(), storage);
-        for (String line : VaultLogUtil.diff(oldStorage, storage, player.getName())) {
-            g.addLogEntry(line);
-        }
-        plugin.storage().save();
+        plugin.vaultLogs().appendEntries(g.getId(), VaultLogUtil.diff(oldStorage, storage, player.getName()));
     }
 
     private int parsePage(String title) {
