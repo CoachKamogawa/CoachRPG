@@ -91,6 +91,9 @@ public final class Storage {
                 }
 
                 guild.setMembersCanClaim(s.getBoolean("membersCanClaim", false));
+                guild.setFriendlyFireEnabled(s.getBoolean("friendlyFireEnabled", false));
+                guild.setAllyFireEnabled(s.getBoolean("allyFireEnabled", false));
+
                 guild.setInWar(s.getBoolean("inWar", false));
                 long warEnds = s.getLong("warEndsAtEpochMs", 0L);
                 guild.setWarEndsAtEpochMs(warEnds == 0L ? null : warEnds);
@@ -158,7 +161,6 @@ public final class Storage {
 
                     // NEW: offline tax notice accumulator
                     pd.setPendingTaxNoticeAmount(pSec.getDouble(uuidStr + ".pendingTaxNoticeAmount", 0.0));
-                    pd.setFriendlyFireProtection(pSec.getBoolean(uuidStr + ".friendlyFireProtection", true));
 
                     playersById.put(uuid, pd);
                 } catch (IllegalArgumentException ignored) {
@@ -207,6 +209,9 @@ public final class Storage {
             guildsYaml.set(base + ".home.z", g.getHomeZ());
 
             guildsYaml.set(base + ".membersCanClaim", g.isMembersCanClaim());
+            guildsYaml.set(base + ".friendlyFireEnabled", g.isFriendlyFireEnabled());
+            guildsYaml.set(base + ".allyFireEnabled", g.isAllyFireEnabled());
+
             guildsYaml.set(base + ".inWar", g.isInWar());
             guildsYaml.set(base + ".warEndsAtEpochMs", g.getWarEndsAtEpochMs() == null ? 0L : g.getWarEndsAtEpochMs());
             guildsYaml.set(base + ".claimedChunks", new ArrayList<>(g.getClaimedChunks()));
@@ -250,7 +255,6 @@ public final class Storage {
 
             // NEW: offline tax notice accumulator
             playersYaml.set(base + ".pendingTaxNoticeAmount", p.getPendingTaxNoticeAmount());
-            playersYaml.set(base + ".friendlyFireProtection", p.isFriendlyFireProtection());
         }
 
         try {
