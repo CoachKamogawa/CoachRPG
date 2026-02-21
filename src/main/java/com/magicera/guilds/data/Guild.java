@@ -42,6 +42,10 @@ public final class Guild {
     private final Set<String> allies = new HashSet<>();
     private final Set<String> enemies = new HashSet<>();
 
+    // pending relationship requests
+    private final Set<String> pendingAllyRequests = new HashSet<>();
+    private final Set<String> pendingWarRequests = new HashSet<>();
+
     public Guild(String id, String name, String prefix, GuildAlignment alignment) {
         this.id = id;
         this.name = name;
@@ -177,6 +181,9 @@ public final class Guild {
     public Set<String> getClaimedChunks() { return claimedChunks; }
     public Set<String> getAllies() { return allies; }
     public Set<String> getEnemies() { return enemies; }
+
+    public Set<String> getPendingAllyRequests() { return pendingAllyRequests; }
+    public Set<String> getPendingWarRequests() { return pendingWarRequests; }
 
     public static String chunkKey(String world, int x, int z) {
         return world + ":" + x + ":" + z;
