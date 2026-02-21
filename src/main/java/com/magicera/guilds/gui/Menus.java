@@ -294,9 +294,12 @@ public final class Menus {
         int headSlot = 22;
         int[] right = new int[]{23, 24, 25, 26};
 
-        // default light gray with side labels on hover
-        for (int s : left) inv.setItem(s, item(Material.LIGHT_GRAY_STAINED_GLASS_PANE, "§cSin", null));
-        for (int s : right) inv.setItem(s, item(Material.LIGHT_GRAY_STAINED_GLASS_PANE, "§aHonor", null));
+        // default light gray with side labels on hover (description/lore)
+        List<String> sinLore = lore("§c§lSin");
+        List<String> honorLore = lore("§a§lHonor");
+
+        for (int s : left) inv.setItem(s, item(Material.LIGHT_GRAY_STAINED_GLASS_PANE, " ", sinLore));
+        for (int s : right) inv.setItem(s, item(Material.LIGHT_GRAY_STAINED_GLASS_PANE, " ", honorLore));
 
         // player head hover shows score + status
         inv.setItem(headSlot, playerHead(viewer, "§bYou", lore(
@@ -309,11 +312,11 @@ public final class Menus {
         // Honor: all lime
         // Balance: fill proportionally on one side only
         if (favor == GuildAlignment.DARK) {
-            for (int s : left) inv.setItem(s, item(Material.RED_STAINED_GLASS_PANE, "§cSin", null));
-            for (int s : right) inv.setItem(s, item(Material.RED_STAINED_GLASS_PANE, "§aHonor", null));
+            for (int s : left) inv.setItem(s, item(Material.RED_STAINED_GLASS_PANE, " ", sinLore));
+            for (int s : right) inv.setItem(s, item(Material.RED_STAINED_GLASS_PANE, " ", honorLore));
         } else if (favor == GuildAlignment.HONORABLE) {
-            for (int s : left) inv.setItem(s, item(Material.LIME_STAINED_GLASS_PANE, "§cSin", null));
-            for (int s : right) inv.setItem(s, item(Material.LIME_STAINED_GLASS_PANE, "§aHonor", null));
+            for (int s : left) inv.setItem(s, item(Material.LIME_STAINED_GLASS_PANE, " ", sinLore));
+            for (int s : right) inv.setItem(s, item(Material.LIME_STAINED_GLASS_PANE, " ", honorLore));
         } else {
             int steps = 4;
 
@@ -321,7 +324,7 @@ public final class Menus {
                 int fill = (int) Math.ceil((Math.min(100, score) / 100.0) * steps);
                 fill = Math.max(0, Math.min(steps, fill));
                 for (int i = 0; i < fill; i++) {
-                    inv.setItem(right[i], item(Material.LIME_STAINED_GLASS_PANE, "§aHonor", null));
+                    inv.setItem(right[i], item(Material.LIME_STAINED_GLASS_PANE, " ", honorLore));
                 }
             } else if (score < 0) {
                 int abs = Math.abs(score);
@@ -329,7 +332,7 @@ public final class Menus {
                 fill = Math.max(0, Math.min(steps, fill));
                 int[] leftNearCenterFirst = new int[]{21, 20, 19, 18};
                 for (int i = 0; i < fill; i++) {
-                    inv.setItem(leftNearCenterFirst[i], item(Material.RED_STAINED_GLASS_PANE, "§cSin", null));
+                    inv.setItem(leftNearCenterFirst[i], item(Material.RED_STAINED_GLASS_PANE, " ", sinLore));
                 }
             }
         }
@@ -339,14 +342,25 @@ public final class Menus {
 
     private static Material logMaterial(String entry) {
         String lower = entry.toLowerCase();
+
+        if (lower.contains("created")) return Material.BEACON;
+        if (lower.contains("rename")) return Material.NAME_TAG;
+        if (lower.contains("description") || lower.contains("title")) return Material.WRITABLE_BOOK;
+        if (lower.contains("newmaster") || lower.contains("master")) return Material.NETHER_STAR;
+        if (lower.contains("promote") || lower.contains("officer")) return Material.GOLDEN_HELMET;
+        if (lower.contains("invite") || lower.contains("join")) return Material.PLAYER_HEAD;
+        if (lower.contains("kick") || lower.contains("remove") || lower.contains("leave")) return Material.IRON_SWORD;
+
         if (lower.contains("deposit")) return Material.EMERALD;
         if (lower.contains("withdraw")) return Material.GOLD_INGOT;
-        if (lower.contains("invite") || lower.contains("join")) return Material.PLAYER_HEAD;
-        if (lower.contains("kick") || lower.contains("remove")) return Material.IRON_SWORD;
         if (lower.contains("tax")) return Material.SUNFLOWER;
         if (lower.contains("war")) return Material.NETHERITE_SWORD;
+        if (lower.contains("truce")) return Material.WHITE_BANNER;
         if (lower.contains("ally")) return Material.LIME_BANNER;
         if (lower.contains("claim")) return Material.GRASS_BLOCK;
+        if (lower.contains("home")) return Material.OAK_DOOR;
+        if (lower.contains("impeach")) return Material.LECTERN;
+
         return Material.PAPER;
     }
 
