@@ -80,6 +80,9 @@ public final class Storage {
                 long masterSince = s.getLong("masterOutOfFavorSinceEpochMs", 0L);
                 guild.setMasterOutOfFavorSinceEpochMs(masterSince == 0L ? null : masterSince);
 
+                long masterWarn = s.getLong("masterOutOfFavorWarnEpochMs", 0L);
+                guild.setMasterOutOfFavorWarnEpochMs(masterWarn == 0L ? null : masterWarn);
+
                 long impSince = s.getLong("impeachmentStartedEpochMs", 0L);
                 guild.setImpeachmentStartedEpochMs(impSince == 0L ? null : impSince);
 
@@ -221,6 +224,10 @@ public final class Storage {
             // Favor / impeachment / log fields
             guildsYaml.set(base + ".masterOutOfFavorSinceEpochMs",
                     g.getMasterOutOfFavorSinceEpochMs() == null ? 0L : g.getMasterOutOfFavorSinceEpochMs());
+
+            guildsYaml.set(base + ".masterOutOfFavorWarnEpochMs",
+                    g.getMasterOutOfFavorWarnEpochMs() == null ? 0L : g.getMasterOutOfFavorWarnEpochMs());
+
             guildsYaml.set(base + ".impeachmentStartedEpochMs",
                     g.getImpeachmentStartedEpochMs() == null ? 0L : g.getImpeachmentStartedEpochMs());
             guildsYaml.set(base + ".kickLockUntilEpochMs", g.getKickLockUntilEpochMs());
