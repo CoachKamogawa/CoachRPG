@@ -180,11 +180,16 @@ public final class Menus {
         for (int i = 9; i < 54; i++) inv.setItem(i, filler());
 
         int slot = 9;
-        for (String allyId : g.getAllies()) {
-            Guild ally = plugin.storage().getGuild(allyId);
-            if (ally == null || slot >= 54) continue;
 
-            UUID master = ally.getMembers().entrySet().stream()
+        java.util.Set<String> relationIds = new java.util.LinkedHashSet<>();
+        relationIds.addAll(g.getAllies());
+        relationIds.addAll(g.getEnemies());
+
+        for (String relationId : relationIds) {
+            Guild relation = plugin.storage().getGuild(relationId);
+            if (relation == null || slot >= 54) continue;
+
+            UUID master = relation.getMembers().entrySet().stream()
                     .filter(e -> e.getValue() == GuildRole.MASTER)
                     .map(Map.Entry::getKey)
                     .findFirst()
@@ -192,12 +197,11 @@ public final class Menus {
             if (master == null) continue;
 
             OfflinePlayer off = Bukkit.getOfflinePlayer(master);
+            String relationLabel = g.getEnemies().contains(relation.getId()) ? "Enemy" : "Ally";
 
-            ItemStack head = playerHead(master, "§a" + Text.color(ally.getName()), lore(
-                    "§7Guild: §r" + Text.color(ally.getName()),
-                    "§7Tag: §7[" + ally.getPrefix() + "§7]",
+            ItemStack head = playerHead(master, Text.color(relation.getName()), lore(
                     "§7Master: §f" + (off.getName() == null ? "Unknown" : off.getName()),
-                    "§7Members: §f" + ally.getMembers().size(),
+                    "§7Relation: §f" + relationLabel,
                     "",
                     "§eClick to view members"
             ));
@@ -294,12 +298,8 @@ public final class Menus {
         int headSlot = 22;
         int[] right = new int[]{23, 24, 25, 26};
 
-        // default light gray with side labels on hover (description/lore)
-        List<String> sinLore = lore("§c§lSin");
-        List<String> honorLore = lore("§a§lHonor");
-
-        for (int s : left) inv.setItem(s, item(Material.LIGHT_GRAY_STAINED_GLASS_PANE, " ", sinLore));
-        for (int s : right) inv.setItem(s, item(Material.LIGHT_GRAY_STAINED_GLASS_PANE, " ", honorLore));
+        for (int s : left) inv.setItem(s, item(Material.LIGHT_GRAY_STAINED_GLASS_PANE, "§c§lSin", null));
+        for (int s : right) inv.setItem(s, item(Material.LIGHT_GRAY_STAINED_GLASS_PANE, "§a§lHonor", null));
 
         // player head hover shows score + status
         inv.setItem(headSlot, playerHead(viewer, "§bYou", lore(
@@ -312,11 +312,11 @@ public final class Menus {
         // Honor: all lime
         // Balance: fill proportionally on one side only
         if (favor == GuildAlignment.DARK) {
-            for (int s : left) inv.setItem(s, item(Material.RED_STAINED_GLASS_PANE, " ", sinLore));
-            for (int s : right) inv.setItem(s, item(Material.RED_STAINED_GLASS_PANE, " ", honorLore));
+            for (int s : left) inv.setItem(s, item(Material.RED_STAINED_GLASS_PANE, "§c§lSin", null));
+            for (int s : right) inv.setItem(s, item(Material.RED_STAINED_GLASS_PANE, "§a§lHonor", null));
         } else if (favor == GuildAlignment.HONORABLE) {
-            for (int s : left) inv.setItem(s, item(Material.LIME_STAINED_GLASS_PANE, " ", sinLore));
-            for (int s : right) inv.setItem(s, item(Material.LIME_STAINED_GLASS_PANE, " ", honorLore));
+            for (int s : left) inv.setItem(s, item(Material.LIME_STAINED_GLASS_PANE, "§c§lSin", null));
+            for (int s : right) inv.setItem(s, item(Material.LIME_STAINED_GLASS_PANE, "§a§lHonor", null));
         } else {
             int steps = 4;
 
@@ -324,7 +324,7 @@ public final class Menus {
                 int fill = (int) Math.ceil((Math.min(100, score) / 100.0) * steps);
                 fill = Math.max(0, Math.min(steps, fill));
                 for (int i = 0; i < fill; i++) {
-                    inv.setItem(right[i], item(Material.LIME_STAINED_GLASS_PANE, " ", honorLore));
+                    inv.setItem(right[i], item(Material.LIME_STAINED_GLASS_PANE, "§a§lHonor", null));
                 }
             } else if (score < 0) {
                 int abs = Math.abs(score);
@@ -332,7 +332,7 @@ public final class Menus {
                 fill = Math.max(0, Math.min(steps, fill));
                 int[] leftNearCenterFirst = new int[]{21, 20, 19, 18};
                 for (int i = 0; i < fill; i++) {
-                    inv.setItem(leftNearCenterFirst[i], item(Material.RED_STAINED_GLASS_PANE, " ", sinLore));
+                    inv.setItem(leftNearCenterFirst[i], item(Material.RED_STAINED_GLASS_PANE, "§c§lSin", null));
                 }
             }
         }
