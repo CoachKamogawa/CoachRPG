@@ -15,6 +15,7 @@ public final class PlayerData {
     private boolean guildChatEnabled;
     private double power;
     private double pendingTaxNoticeAmount;
+    private boolean friendlyFireProtection;
 
     public PlayerData(UUID uuid) {
         this.uuid = uuid;
@@ -25,6 +26,7 @@ public final class PlayerData {
         this.guildChatEnabled = false;
         this.power = 15.0;
         this.pendingTaxNoticeAmount = 0.0;
+        this.friendlyFireProtection = true;
     }
 
     public UUID getUuid() { return uuid; }
@@ -48,10 +50,17 @@ public final class PlayerData {
     public void setGuildChatEnabled(boolean guildChatEnabled) { this.guildChatEnabled = guildChatEnabled; }
 
     public double getPower() { return power; }
-    public void setPower(double power) { this.power = Math.max(0.0, Math.min(15.0, power)); }
+    public void setPower(double power) {
+        this.power = Math.max(0.0, power);
+    }
 
     public double getPendingTaxNoticeAmount() { return pendingTaxNoticeAmount; }
     public void setPendingTaxNoticeAmount(double pendingTaxNoticeAmount) {
         this.pendingTaxNoticeAmount = Math.max(0.0, pendingTaxNoticeAmount);
+    }
+
+    public boolean isFriendlyFireProtection() { return friendlyFireProtection; }
+    public void setFriendlyFireProtection(boolean friendlyFireProtection) {
+        this.friendlyFireProtection = friendlyFireProtection;
     }
 }
