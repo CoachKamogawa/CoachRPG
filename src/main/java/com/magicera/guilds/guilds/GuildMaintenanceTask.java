@@ -86,16 +86,22 @@ public final class GuildMaintenanceTask implements Runnable {
             if (guild.isInWar() && guild.getWarEndsAtEpochMs() != null && now >= guild.getWarEndsAtEpochMs()) {
                 guild.setInWar(false);
                 guild.setWarEndsAtEpochMs(null);
+                guild.setWarSessionId(null);
+                guild.getWarningSentWarSession().clear();
                 guild.addLogEntry("War ended.");
             }
 
             if (!guild.isInWar()) {
-                double regenPerMinute = 3.333 / 60.0;
+                double regenPerMinute = plugin.territoryConfig().getDouble("playerPowerRegenPerHour", 3.33) / 60.0;
                 for (UUID memberId : guild.getMembers().keySet()) {
                     PlayerData memberPd = plugin.storage().getOrCreatePlayer(memberId);
-                    memberPd.setPower(memberPd.getPower() + regenPerMinute);
+                    double max = plugin.guildPower().playerPowerMax();
+                    memberPd.setPower(Math.min(max, memberPd.getPower() + regenPerMinute));
                 }
             }
+
+            plugin.guildPower().clampAllPowers();
+            plugin.guildPower().handlePowerThresholds(guild);
         }
 
         for (String guildId : toDelete) {
@@ -147,7 +153,7 @@ public final class GuildMaintenanceTask implements Runnable {
                 .map(Map.Entry::getKey)
                 .toList();
 
-        UUID replacement = null;
+        UUID replacement;
         if (!officers.isEmpty()) {
             replacement = officers.get(new Random().nextInt(officers.size()));
         } else {
