@@ -144,6 +144,9 @@ public final class GuildCommand implements TabExecutor {
             return true;
         }
 
+        // -------------------------
+        // CLAIM / OVERCLAIM
+        // -------------------------
         if (sub.equals("claimland")) {
             if (!(sender instanceof Player player)) {
                 sender.sendMessage("§cPlayers only.");
@@ -165,13 +168,28 @@ public final class GuildCommand implements TabExecutor {
                 sender.sendMessage("§cYou need at least 10 power to claim a chunk.");
                 return true;
             }
+
             String key = Guild.chunkKey(player.getWorld().getName(), player.getChunk().getX(), player.getChunk().getZ());
+
+            Guild owner = null;
             for (Guild other : plugin.storage().allGuilds()) {
                 if (other.getClaimedChunks().contains(key)) {
-                    sender.sendMessage("§cThat chunk is already claimed by " + other.getName());
-                    return true;
+                    owner = other;
+                    break;
                 }
             }
+
+            if (owner != null) {
+                boolean atWar = g.getEnemies().contains(owner.getId());
+                boolean overclaimable = owner.getClaimedChunks().size() > maxClaims(owner);
+                if (!atWar || !overclaimable) {
+                    sender.sendMessage("§cThat chunk is already claimed by " + owner.getName());
+                    return true;
+                }
+                owner.getClaimedChunks().remove(key);
+                owner.addLogEntry("Lost claim at " + key + " to overclaim by " + g.getName());
+            }
+
             int max = maxClaims(g);
             if (g.getClaimedChunks().size() >= max) {
                 sender.sendMessage("§cGuild claim cap reached (§f" + max + "§c). Increase guild power.");
@@ -181,6 +199,40 @@ public final class GuildCommand implements TabExecutor {
             g.addLogEntry("Claimed land at " + key + " by " + player.getName());
             plugin.storage().save();
             sender.sendMessage("§aChunk claimed for your guild.");
+            return true;
+        }
+
+        if (sub.equals("unclaim")) {
+            if (!(sender instanceof Player player)) return true;
+            PlayerData pd = plugin.storage().getOrCreatePlayer(player.getUniqueId());
+            Guild g = pd.getGuildId() == null ? null : plugin.storage().getGuild(pd.getGuildId());
+            if (g == null) {
+                sender.sendMessage("§cYou are not in a guild.");
+                return true;
+            }
+            GuildRole role = g.getMembers().get(player.getUniqueId());
+            if (role != GuildRole.MASTER) {
+                sender.sendMessage("§cOnly the guild master can unclaim land.");
+                return true;
+            }
+
+            if (args.length >= 2 && args[1].equalsIgnoreCase("all")) {
+                int removed = g.getClaimedChunks().size();
+                g.getClaimedChunks().clear();
+                g.addLogEntry("Unclaimed all land by " + player.getName());
+                plugin.storage().save();
+                sender.sendMessage("§aUnclaimed all guild land (§f" + removed + "§a chunks).");
+                return true;
+            }
+
+            String key = Guild.chunkKey(player.getWorld().getName(), player.getChunk().getX(), player.getChunk().getZ());
+            if (!g.getClaimedChunks().remove(key)) {
+                sender.sendMessage("§cThis chunk is not claimed by your guild.");
+                return true;
+            }
+            g.addLogEntry("Unclaimed land at " + key + " by " + player.getName());
+            plugin.storage().save();
+            sender.sendMessage("§aChunk unclaimed.");
             return true;
         }
 
@@ -199,10 +251,98 @@ public final class GuildCommand implements TabExecutor {
             return true;
         }
 
-        if (sub.equals("ally") || sub.equals("war")) {
+        // -------------------------
+        // POWER
+        // -------------------------
+        if (sub.equals("power")) {
+            if (args.length == 1) {
+                if (!(sender instanceof Player player)) {
+                    sender.sendMessage("§cPlayers only.");
+                    return true;
+                }
+                PlayerData pd = plugin.storage().getOrCreatePlayer(player.getUniqueId());
+                if (pd.getGuildId() == null) {
+                    sender.sendMessage("§7Your Power: §f" + fmt(pd.getPower()));
+                    sender.sendMessage("§7Guild Power: §fN/A");
+                    return true;
+                }
+                Guild g = plugin.storage().getGuild(pd.getGuildId());
+                if (g == null) {
+                    sender.sendMessage("§7Your Power: §f" + fmt(pd.getPower()));
+                    sender.sendMessage("§7Guild Power: §fN/A");
+                    return true;
+                }
+                sender.sendMessage("§7Your Power: §f" + fmt(pd.getPower()));
+                sender.sendMessage("§7Guild Power: §f" + fmt(guildPower(g)));
+                return true;
+            }
+
+            if (!sender.hasPermission("magicera.admin")) {
+                sender.sendMessage("§cNo permission.");
+                return true;
+            }
+            if ((!args[1].equalsIgnoreCase("add") && !args[1].equalsIgnoreCase("remove")) || args.length < 3) {
+                sender.sendMessage("§cUsage: /guild power <add|remove> <amount> [player]");
+                return true;
+            }
+
+            double amount = parseMoney(args[2]);
+            UUID targetId;
+            if (args.length >= 4) {
+                targetId = resolvePlayerUuid(args[3]);
+                if (targetId == null) {
+                    sender.sendMessage("§cUnknown player: " + args[3]);
+                    return true;
+                }
+            } else if (sender instanceof Player player) {
+                targetId = player.getUniqueId();
+            } else {
+                sender.sendMessage("§cConsole must specify a player.");
+                return true;
+            }
+
+            if (amount <= 0.0) {
+                sender.sendMessage("§cAmount must be > 0.");
+                return true;
+            }
+
+            PlayerData tpd = plugin.storage().getOrCreatePlayer(targetId);
+            double delta = args[1].equalsIgnoreCase("remove") ? -amount : amount;
+            tpd.setPower(tpd.getPower() + delta);
+            plugin.storage().save();
+            sender.sendMessage("§aPower updated for §f" + safeName(targetId) + "§a: §f" + fmt(tpd.getPower()));
+            return true;
+        }
+
+        // -------------------------
+        // FRIENDLY FIRE
+        // -------------------------
+        if (sub.equals("friendlyfire")) {
+            if (!(sender instanceof Player player)) {
+                sender.sendMessage("§cPlayers only.");
+                return true;
+            }
+            if (args.length < 2 || (!args[1].equalsIgnoreCase("on") && !args[1].equalsIgnoreCase("off"))) {
+                sender.sendMessage("§cUsage: /guild friendlyfire <on|off>");
+                return true;
+            }
+            PlayerData pd = plugin.storage().getOrCreatePlayer(player.getUniqueId());
+            boolean protect = args[1].equalsIgnoreCase("on");
+            pd.setFriendlyFireProtection(protect);
+            plugin.storage().save();
+            sender.sendMessage(protect
+                    ? "§aFriendly fire protection enabled."
+                    : "§eFriendly fire protection disabled. Both players must disable protection for friendly damage to apply.");
+            return true;
+        }
+
+        // -------------------------
+        // ALLY / UNALLY / WAR / TRUCE
+        // -------------------------
+        if (sub.equals("unally")) {
             if (!(sender instanceof Player player)) return true;
             if (args.length < 2) {
-                sender.sendMessage("§cUsage: /guild " + sub + " <player|guild>");
+                sender.sendMessage("§cUsage: /guild unally <player|guild>");
                 return true;
             }
             Guild actor = guildOf(player.getUniqueId());
@@ -219,33 +359,49 @@ public final class GuildCommand implements TabExecutor {
                 sender.sendMessage("§cInvalid target guild.");
                 return true;
             }
-            if (sub.equals("ally")) {
-                actor.getAllies().add(target.getId());
-                target.getAllies().add(actor.getId());
-                actor.getEnemies().remove(target.getId());
-                target.getEnemies().remove(actor.getId());
-                actor.addLogEntry("Alliance formed with " + target.getName());
-                target.addLogEntry("Alliance formed with " + actor.getName());
-                plugin.storage().save();
-                sender.sendMessage("§aAlliance formed with " + target.getName());
-            } else {
-                boolean sameFavor = actor.getAlignment() == target.getAlignment();
-                if (sameFavor) {
-                    sender.sendMessage("§eSame favor war request auto-accepted in this build.");
-                }
-                actor.getEnemies().add(target.getId());
-                target.getEnemies().add(actor.getId());
-                actor.getAllies().remove(target.getId());
-                target.getAllies().remove(actor.getId());
-                actor.setInWar(true);
-                target.setInWar(true);
-                long warEnd = System.currentTimeMillis() + (24L * 60L * 60L * 1000L);
-                actor.setWarEndsAtEpochMs(warEnd);
-                target.setWarEndsAtEpochMs(warEnd);
-                plugin.storage().save();
-                Bukkit.broadcastMessage("§7[§5Magic Era§7] §f" + Text.stripColors(actor.getName()) + " has declared war on " + Text.stripColors(target.getName()) + "!");
-            }
+            actor.getAllies().remove(target.getId());
+            target.getAllies().remove(actor.getId());
+            plugin.storage().save();
+            sender.sendMessage("§eAlliance ended with " + target.getName());
             return true;
+        }
+
+        if (sub.equals("truce")) {
+            if (!(sender instanceof Player player)) return true;
+            if (args.length < 2) {
+                sender.sendMessage("§cUsage: /guild truce <player|guild>");
+                return true;
+            }
+            Guild actor = guildOf(player.getUniqueId());
+            if (actor == null) {
+                sender.sendMessage("§cYou are not in a guild.");
+                return true;
+            }
+            if (actor.getMembers().get(player.getUniqueId()) != GuildRole.MASTER) {
+                sender.sendMessage("§cOnly the guild master can use this command.");
+                return true;
+            }
+            Guild target = resolveGuildTarget(args[1]);
+            if (target == null || target.getId().equals(actor.getId())) {
+                sender.sendMessage("§cInvalid target guild.");
+                return true;
+            }
+            if (!actor.getEnemies().contains(target.getId())) {
+                sender.sendMessage("§cYour guild is not at war with that guild.");
+                return true;
+            }
+            endWar(actor, target);
+            plugin.storage().save();
+            Bukkit.broadcastMessage("§7[§bMagic Era§7] " + actor.getName() + " §fand " + target.getName() + " §fhave ended their war with each other.");
+            return true;
+        }
+
+        if (sub.equals("ally")) {
+            return handleAllyCommand(sender, args);
+        }
+
+        if (sub.equals("war")) {
+            return handleWarCommand(sender, args);
         }
 
         // -------------------------
@@ -485,6 +641,9 @@ public final class GuildCommand implements TabExecutor {
             return true;
         }
 
+        // -------------------------
+        // DESC
+        // -------------------------
         if (sub.equals("desc")) {
             if (!(sender instanceof Player player)) {
                 sender.sendMessage("§cPlayers only.");
@@ -513,6 +672,9 @@ public final class GuildCommand implements TabExecutor {
             return true;
         }
 
+        // -------------------------
+        // INFO
+        // -------------------------
         if (sub.equals("info")) {
             if (!(sender instanceof Player player)) {
                 sender.sendMessage("§cPlayers only.");
@@ -1229,7 +1391,7 @@ public final class GuildCommand implements TabExecutor {
             plugin.storage().deleteGuild(g.getId());
             plugin.storage().save();
 
-            Bukkit.broadcastMessage("§7[§aGuild§7] §cGuild disbanded: §r" + Text.color(g.getName()));
+            Bukkit.broadcastMessage("§7[§aGuild§7] " + g.getName() + " §fhas disbanded...");
             return true;
         }
 
@@ -1249,9 +1411,9 @@ public final class GuildCommand implements TabExecutor {
         // /guild <sub>
         if (args.length == 1) {
             List<String> subs = new ArrayList<>(List.of(
-                    "help", "menu", "chat", "home", "sethome", "claimland", "claimtoggle", "ally", "war",
+                    "help", "menu", "chat", "home", "sethome", "claimland", "claimtoggle", "unclaim", "ally", "unally", "war", "truce",
                     "create", "invite", "accept", "leave", "kick", "promote", "newmaster", "title", "deny", "disband", "impeach",
-                    "bank", "deposit", "withdraw", "tax", "desc", "info", "?", "1", "2"
+                    "bank", "deposit", "withdraw", "tax", "desc", "info", "power", "friendlyfire", "?", "1", "2"
             ));
             if (sender.hasPermission("magicera.admin")) {
                 subs.add("reload");
@@ -1266,7 +1428,8 @@ public final class GuildCommand implements TabExecutor {
         String sub = args[0].toLowerCase();
 
         // /guild invite <player> etc
-        if ((sub.equals("invite") || sub.equals("kick") || sub.equals("newmaster") || sub.equals("promote") || sub.equals("title") || sub.equals("ally") || sub.equals("war")) && args.length == 2) {
+        if ((sub.equals("invite") || sub.equals("kick") || sub.equals("newmaster") || sub.equals("promote") || sub.equals("title")
+                || sub.equals("ally") || sub.equals("unally") || sub.equals("war") || sub.equals("truce")) && args.length == 2) {
             List<String> opts = new ArrayList<>(onlinePlayerNames());
             opts.addAll(plugin.storage().allGuilds().stream().map(Guild::getId).toList());
             return filterPrefix(opts, input);
@@ -1281,6 +1444,11 @@ public final class GuildCommand implements TabExecutor {
             return filterPrefix(guildIds, input);
         }
 
+        if (sub.equals("war") && args.length == 3 && args[1].equalsIgnoreCase("accept")) {
+            List<String> guildIds = plugin.storage().allGuilds().stream().map(Guild::getId).sorted().collect(Collectors.toList());
+            return filterPrefix(guildIds, input);
+        }
+
         if (sub.equals("kick") && args.length == 3 && sender.hasPermission("magicera.admin")) {
             List<String> guildIds = plugin.storage().allGuilds().stream().map(Guild::getId).sorted().collect(Collectors.toList());
             return filterPrefix(guildIds, input);
@@ -1288,6 +1456,26 @@ public final class GuildCommand implements TabExecutor {
 
         if (sub.equals("disband") && args.length == 2) {
             return filterPrefix(List.of("confirm"), input);
+        }
+
+        if (sub.equals("unclaim") && args.length == 2) {
+            return filterPrefix(List.of("all"), input);
+        }
+
+        if (sub.equals("friendlyfire") && args.length == 2) {
+            return filterPrefix(List.of("on", "off"), input);
+        }
+
+        if (sub.equals("power") && args.length == 2 && sender.hasPermission("magicera.admin")) {
+            return filterPrefix(List.of("add", "remove"), input);
+        }
+
+        if (sub.equals("power") && args.length == 3 && sender.hasPermission("magicera.admin")) {
+            return filterPrefix(List.of("1", "2", "5", "10"), input);
+        }
+
+        if (sub.equals("power") && args.length == 4 && sender.hasPermission("magicera.admin")) {
+            return filterPrefix(onlinePlayerNames(), input);
         }
 
         if (sub.equals("impeach") && args.length == 2) {
@@ -1380,8 +1568,14 @@ public final class GuildCommand implements TabExecutor {
             sender.sendMessage("§7/guild deposit <amount>");
             sender.sendMessage("§7/guild withdraw <amount>");
             sender.sendMessage("§7/guild claimland");
+            sender.sendMessage("§7/guild unclaim §8(or /guild unclaim all)");
+            sender.sendMessage("§7/guild power");
+            sender.sendMessage("§7/guild friendlyfire <on|off>");
             sender.sendMessage("§7/guild ally <player|guild>");
+            sender.sendMessage("§7/guild unally <player|guild>");
             sender.sendMessage("§7/guild war <player|guild>");
+            sender.sendMessage("§7/guild war accept <guild>");
+            sender.sendMessage("§7/guild truce <player|guild>");
             sender.sendMessage("§7/guild impeach §8(or /guild impeach <remove|keep>)");
         }
         if (role == GuildRole.MASTER) {
@@ -1390,7 +1584,7 @@ public final class GuildCommand implements TabExecutor {
             sender.sendMessage("§7/guild claimtoggle");
         }
         if (sender.hasPermission("magicera.admin")) {
-            sender.sendMessage("§7/guild reload | add | adminadd | adminkick | forcetax");
+            sender.sendMessage("§7/guild reload | add | adminadd | adminkick | forcetax | power");
         }
     }
 
@@ -1424,14 +1618,7 @@ public final class GuildCommand implements TabExecutor {
     }
 
     private int maxClaims(Guild guild) {
-        int max = 4;
-        for (UUID memberId : guild.getMembers().keySet()) {
-            PlayerData pd = plugin.storage().getOrCreatePlayer(memberId);
-            GuildRole role = guild.getMembers().get(memberId);
-            if (role == GuildRole.MASTER) continue;
-            max += (int) Math.floor(pd.getPower() / 10.0);
-        }
-        return max;
+        return (int) Math.floor(guildPower(guild));
     }
 
     private void sendGuildInfo(Player viewer, Guild g) {
@@ -1470,6 +1657,151 @@ public final class GuildCommand implements TabExecutor {
             names.add(guild == null ? id : Text.stripColors(guild.getName()));
         }
         return String.join(", ", names);
+    }
+
+    private boolean handleAllyCommand(CommandSender sender, String[] args) {
+        if (!(sender instanceof Player player)) return true;
+        if (args.length < 2) {
+            sender.sendMessage("§cUsage: /guild ally <player|guild>");
+            return true;
+        }
+
+        Guild actor = guildOf(player.getUniqueId());
+        if (actor == null) {
+            sender.sendMessage("§cYou are not in a guild.");
+            return true;
+        }
+        if (actor.getMembers().get(player.getUniqueId()) != GuildRole.MASTER) {
+            sender.sendMessage("§cOnly the guild master can use this command.");
+            return true;
+        }
+
+        Guild target = resolveGuildTarget(args[1]);
+        if (target == null || target.getId().equals(actor.getId())) {
+            sender.sendMessage("§cInvalid target guild.");
+            return true;
+        }
+
+        if (!canAlly(actor, target)) {
+            sender.sendMessage("§cYour guild type cannot ally with that guild type.");
+            return true;
+        }
+
+        actor.getPendingAllyRequests().remove(target.getId());
+        target.getPendingAllyRequests().remove(actor.getId());
+        actor.getAllies().add(target.getId());
+        target.getAllies().add(actor.getId());
+        actor.getEnemies().remove(target.getId());
+        target.getEnemies().remove(actor.getId());
+        actor.addLogEntry("Alliance formed with " + target.getName());
+        target.addLogEntry("Alliance formed with " + actor.getName());
+        plugin.storage().save();
+
+        Bukkit.broadcastMessage("§7[§bMagic Era§7] " + actor.getName() + " §fand " + target.getName() + " §fhave formed an alliance!");
+        return true;
+    }
+
+    private boolean handleWarCommand(CommandSender sender, String[] args) {
+        if (!(sender instanceof Player player)) return true;
+
+        Guild actor = guildOf(player.getUniqueId());
+        if (actor == null) {
+            sender.sendMessage("§cYou are not in a guild.");
+            return true;
+        }
+        if (actor.getMembers().get(player.getUniqueId()) != GuildRole.MASTER) {
+            sender.sendMessage("§cOnly the guild master can use this command.");
+            return true;
+        }
+
+        if (args.length >= 3 && args[1].equalsIgnoreCase("accept")) {
+            Guild requester = resolveGuildTarget(args[2]);
+            if (requester == null || requester.getId().equals(actor.getId())) {
+                sender.sendMessage("§cInvalid target guild.");
+                return true;
+            }
+            if (!actor.getPendingWarRequests().remove(requester.getId())) {
+                sender.sendMessage("§cNo pending war request from that guild.");
+                return true;
+            }
+            declareWar(requester, actor);
+            plugin.storage().save();
+            return true;
+        }
+
+        if (args.length < 2) {
+            sender.sendMessage("§cUsage: /guild war <player|guild> or /guild war accept <guild>");
+            return true;
+        }
+
+        Guild target = resolveGuildTarget(args[1]);
+        if (target == null || target.getId().equals(actor.getId())) {
+            sender.sendMessage("§cInvalid target guild.");
+            return true;
+        }
+
+        if (actor.getAlignment() == GuildAlignment.HONORABLE) {
+            target.getPendingWarRequests().add(actor.getId());
+            plugin.storage().save();
+            sender.sendMessage("§eWar request sent to " + target.getName() + ". They must accept with /guild war accept " + actor.getId());
+            return true;
+        }
+
+        declareWar(actor, target);
+        plugin.storage().save();
+        return true;
+    }
+
+    private void declareWar(Guild actor, Guild target) {
+        actor.getEnemies().add(target.getId());
+        target.getEnemies().add(actor.getId());
+        actor.getAllies().remove(target.getId());
+        target.getAllies().remove(actor.getId());
+        actor.setInWar(true);
+        target.setInWar(true);
+        long warEnd = System.currentTimeMillis() + (24L * 60L * 60L * 1000L);
+        actor.setWarEndsAtEpochMs(warEnd);
+        target.setWarEndsAtEpochMs(warEnd);
+
+        for (String allyId : new HashSet<>(actor.getAllies())) {
+            Guild ally = plugin.storage().getGuild(allyId);
+            if (ally == null || ally.getId().equals(target.getId())) continue;
+            ally.getEnemies().add(target.getId());
+            target.getEnemies().add(ally.getId());
+            ally.setInWar(true);
+            ally.setWarEndsAtEpochMs(warEnd);
+        }
+
+        Bukkit.broadcastMessage("§7[§bMagic Era§7] " + actor.getName() + " §fhas declared war on " + target.getName() + "§f!");
+    }
+
+    private void endWar(Guild a, Guild b) {
+        a.getEnemies().remove(b.getId());
+        b.getEnemies().remove(a.getId());
+        if (a.getEnemies().isEmpty()) {
+            a.setInWar(false);
+            a.setWarEndsAtEpochMs(null);
+        }
+        if (b.getEnemies().isEmpty()) {
+            b.setInWar(false);
+            b.setWarEndsAtEpochMs(null);
+        }
+    }
+
+    private boolean canAlly(Guild a, Guild b) {
+        if (a.getAlignment() == GuildAlignment.NEUTRAL) return true;
+        if (a.getAlignment() == GuildAlignment.DARK) {
+            return b.getAlignment() == GuildAlignment.DARK || b.getAlignment() == GuildAlignment.NEUTRAL;
+        }
+        return b.getAlignment() == GuildAlignment.HONORABLE;
+    }
+
+    private double guildPower(Guild g) {
+        double power = 0.0;
+        for (UUID id : g.getMembers().keySet()) {
+            power += plugin.storage().getOrCreatePlayer(id).getPower();
+        }
+        return power;
     }
 
     private static final class ParsedCreate {
