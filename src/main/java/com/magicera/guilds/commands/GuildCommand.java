@@ -440,7 +440,11 @@ public final class GuildCommand implements TabExecutor {
             }
             endWar(actor, target);
             plugin.storage().save();
-            Bukkit.broadcastMessage("§7[§bMagic Era§7] " + actor.getName() + " §fand " + target.getName() + " §fhave ended their war with each other.");
+            Bukkit.broadcastMessage("§7[§bMagic Era§7] "
+                    + Text.color(actor.getName())
+                    + " §fand "
+                    + Text.color(target.getName())
+                    + " §fhave ended their war with each other.");
             return true;
         }
 
@@ -1795,7 +1799,11 @@ public final class GuildCommand implements TabExecutor {
             requester.addLogEntry("Alliance formed with " + actor.getName());
             plugin.storage().save();
 
-            Bukkit.broadcastMessage("§7[§bMagic Era§7] " + actor.getName() + " §fand " + requester.getName() + " §fhave formed an alliance!");
+            Bukkit.broadcastMessage("§7[§bMagic Era§7] "
+                    + Text.color(actor.getName())
+                    + " §fand "
+                    + Text.color(requester.getName())
+                    + " §fhave formed an alliance!");
             return true;
         }
 
@@ -1831,7 +1839,7 @@ public final class GuildCommand implements TabExecutor {
         actor.getAllyRequestCooldowns().put(target.getId(), now + (30L * 60L * 1000L));
         plugin.storage().save();
 
-        sender.sendMessage("§eAlliance request sent to " + target.getName() + ". They must accept with /guild ally accept " + actor.getId());
+        sender.sendMessage("§7[§aGuild§7] §fYou have requested an alliance with " + Text.color(target.getName()) + "§f!");
 
         Player targetMaster = onlineGuildMaster(target);
         if (targetMaster != null) {
@@ -1897,7 +1905,7 @@ public final class GuildCommand implements TabExecutor {
             target.getPendingWarRequests().add(actor.getId());
             actor.getWarRequestCooldowns().put(target.getId(), now + (30L * 60L * 1000L));
             plugin.storage().save();
-            sender.sendMessage("§eWar request sent to " + target.getName() + ". They must accept with /guild war accept " + actor.getId());
+            sender.sendMessage("§7[§aGuild§7] §fYou have formally requested war against " + Text.color(target.getName()) + "§f!");
 
             Player targetMaster = onlineGuildMaster(target);
             if (targetMaster != null) {
@@ -1932,7 +1940,11 @@ public final class GuildCommand implements TabExecutor {
             ally.setWarEndsAtEpochMs(warEnd);
         }
 
-        Bukkit.broadcastMessage("§7[§bMagic Era§7] " + actor.getName() + " §fhas declared war on " + target.getName() + "§f!");
+        Bukkit.broadcastMessage("§7[§bMagic Era§7] "
+                + Text.color(actor.getName())
+                + " §fhas declared war against "
+                + Text.color(target.getName())
+                + "§f!");
     }
 
     private void endWar(Guild a, Guild b) {
@@ -1953,7 +1965,7 @@ public final class GuildCommand implements TabExecutor {
         if (a.getAlignment() == GuildAlignment.DARK) {
             return b.getAlignment() == GuildAlignment.DARK || b.getAlignment() == GuildAlignment.NEUTRAL;
         }
-        return b.getAlignment() == GuildAlignment.HONORABLE;
+        return b.getAlignment() == GuildAlignment.HONORABLE || b.getAlignment() == GuildAlignment.NEUTRAL;
     }
 
     private Player onlineGuildMaster(Guild guild) {
