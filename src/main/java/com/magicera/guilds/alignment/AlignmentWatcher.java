@@ -36,6 +36,7 @@ public final class AlignmentWatcher implements Runnable {
         PlayerData pd = plugin.storage().getOrCreatePlayer(p.getUniqueId());
         if (pd.getGuildId() == null) {
             pd.setOutOfAlignmentSinceEpochMs(null);
+            pd.setLastOutOfAlignmentWarnEpochMs(null);
             return;
         }
 
@@ -43,6 +44,7 @@ public final class AlignmentWatcher implements Runnable {
         if (g == null) {
             pd.setGuildId(null);
             pd.setOutOfAlignmentSinceEpochMs(null);
+            pd.setLastOutOfAlignmentWarnEpochMs(null);
             plugin.storage().save();
             return;
         }
@@ -52,8 +54,9 @@ public final class AlignmentWatcher implements Runnable {
 
         // If alignment matches, clear timer
         if (playerGroup == guildGroup) {
-            if (pd.getOutOfAlignmentSinceEpochMs() != null) {
+            if (pd.getOutOfAlignmentSinceEpochMs() != null || pd.getLastOutOfAlignmentWarnEpochMs() != null) {
                 pd.setOutOfAlignmentSinceEpochMs(null);
+                pd.setLastOutOfAlignmentWarnEpochMs(null);
                 plugin.storage().save();
             }
             return;
@@ -61,11 +64,23 @@ public final class AlignmentWatcher implements Runnable {
 
         long now = System.currentTimeMillis();
         Long since = pd.getOutOfAlignmentSinceEpochMs();
+        Long lastWarn = pd.getLastOutOfAlignmentWarnEpochMs();
+
+        boolean shouldSend = isLogin;
 
         if (since == null) {
             pd.setOutOfAlignmentSinceEpochMs(now);
-            plugin.storage().save();
             since = now;
+            shouldSend = true;
+        } else {
+            long repeatMs = TimeUnit.MINUTES.toMillis(15);
+            if (!shouldSend && (lastWarn == null || now - lastWarn >= repeatMs)) {
+                shouldSend = true;
+            }
+        }
+
+        if (!shouldSend) {
+            return;
         }
 
         long graceHours = plugin.getConfig().getLong("alignment.out-of-alignment-grace-hours", 48);
@@ -93,6 +108,9 @@ public final class AlignmentWatcher implements Runnable {
 
         msg = msg.replace("%timeleft%", timeLeft).replace("%restore%", Text.color(restore));
         p.sendMessage(Text.color(msg));
+
+        pd.setLastOutOfAlignmentWarnEpochMs(now);
+        plugin.storage().save();
 
         // (Kick logic can be added later if remaining == 0)
     }
