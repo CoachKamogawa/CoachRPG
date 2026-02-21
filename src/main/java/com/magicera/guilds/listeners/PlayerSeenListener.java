@@ -34,6 +34,15 @@ public final class PlayerSeenListener implements Listener {
             pd.setPendingTaxNoticeAmount(0.0);
         }
 
+        // Pending guild messages (queued while offline)
+        if (!pd.getPendingGuildMessages().isEmpty()) {
+            for (String message : pd.getPendingGuildMessages()) {
+                if (message == null || message.isBlank()) continue;
+                e.getPlayer().sendMessage(message);
+            }
+            pd.getPendingGuildMessages().clear();
+        }
+
         plugin.storage().save();
     }
 
