@@ -9,11 +9,13 @@ import com.magicera.guilds.commands.PartyCommand;
 import com.magicera.guilds.econ.EconomyHook;
 import com.magicera.guilds.gui.MenuListener;
 import com.magicera.guilds.guilds.GuildMaintenanceTask;
+import com.magicera.guilds.guilds.GuildPowerService;
 import com.magicera.guilds.guilds.InviteManager;
 import com.magicera.guilds.guilds.VaultLogManager;
 import com.magicera.guilds.guilds.VaultManager;
 import com.magicera.guilds.listeners.GuildChatListener;
 import com.magicera.guilds.listeners.GuildProtectionListener;
+import com.magicera.guilds.listeners.GuildWarPowerListener;
 import com.magicera.guilds.listeners.PlayerSeenListener;
 import com.magicera.guilds.storage.Storage;
 import net.milkbowl.vault.economy.Economy;
@@ -24,7 +26,10 @@ import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.command.PluginCommand;
 import org.bukkit.command.TabCompleter;
+import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.plugin.java.JavaPlugin;
+
+import java.io.File;
 
 public final class MagicEraGuildsPlugin extends JavaPlugin {
 
@@ -35,8 +40,11 @@ public final class MagicEraGuildsPlugin extends JavaPlugin {
     private InviteManager inviteManager;
     private VaultManager vaults;
     private VaultLogManager vaultLogs;
+    private GuildPowerService guildPower;
 
     private EconomyHook economyHook;
+    private File territoryFile;
+    private YamlConfiguration territoryConfig;
     private long nextGuildTaxEpochMs;
 
     public Storage storage() { return storage; }
@@ -45,12 +53,20 @@ public final class MagicEraGuildsPlugin extends JavaPlugin {
     public VaultManager vaults() { return vaults; }
     public VaultLogManager vaultLogs() { return vaultLogs; }
     public EconomyHook economy() { return economyHook; }
+    public GuildPowerService guildPower() { return guildPower; }
+    public YamlConfiguration territoryConfig() { return territoryConfig == null ? getConfig() : territoryConfig; }
     public long nextGuildTaxEpochMs() { return nextGuildTaxEpochMs; }
 
     @Override
     public void onEnable() {
         try {
             saveDefaultConfig();
+
+            if (!new File(getDataFolder(), "territory.yml").exists()) {
+                saveResource("territory.yml", false);
+            }
+            territoryFile = new File(getDataFolder(), "territory.yml");
+            territoryConfig = YamlConfiguration.loadConfiguration(territoryFile);
 
             storage = new Storage(this);
             storage.load();
@@ -60,6 +76,7 @@ public final class MagicEraGuildsPlugin extends JavaPlugin {
             vaultLogs = new VaultLogManager(this);
 
             economyHook = new EconomyHook();
+            guildPower = new GuildPowerService(this);
             boolean econOk = economyHook.setup();
 
             long now = System.currentTimeMillis();
@@ -76,6 +93,7 @@ public final class MagicEraGuildsPlugin extends JavaPlugin {
             Bukkit.getPluginManager().registerEvents(new PlayerSeenListener(this), this);
             Bukkit.getPluginManager().registerEvents(new GuildChatListener(this), this);
             Bukkit.getPluginManager().registerEvents(new GuildProtectionListener(this), this);
+            Bukkit.getPluginManager().registerEvents(new GuildWarPowerListener(this), this);
 
             alignmentWatcher = new AlignmentWatcher(this);
             Bukkit.getPluginManager().registerEvents(new JoinListener(alignmentWatcher), this);
@@ -99,7 +117,7 @@ public final class MagicEraGuildsPlugin extends JavaPlugin {
                     20L * 60L * warnMinutes,
                     20L * 60L * warnMinutes);
 
-            // Guild maintenance (auto-disband, auto-master, impeachment checks)
+            // Guild maintenance (auto-disband, auto-master, impeachment checks, power + warnings)
             Bukkit.getScheduler().runTaskTimer(this, new GuildMaintenanceTask(this), 20L * 60L, 20L * 60L);
 
             getLogger().info("====================================");
@@ -178,6 +196,9 @@ public final class MagicEraGuildsPlugin extends JavaPlugin {
 
     @Override
     public void onDisable() {
+        if (territoryConfig != null && territoryFile != null) {
+            try { territoryConfig.save(territoryFile); } catch (Exception ignored) {}
+        }
         if (storage != null) {
             try { storage.save(); } catch (Exception ignored) {}
         }
