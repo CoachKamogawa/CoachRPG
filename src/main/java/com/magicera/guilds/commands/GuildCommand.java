@@ -310,9 +310,10 @@ public final class GuildCommand implements TabExecutor {
 
             if (owner != null) {
                 boolean atWar = g.getEnemies().contains(owner.getId());
-                boolean overclaimable = plugin.guildPower().canOverclaimChunk(owner, key) && atWar;
+                boolean allowWarOverclaims = plugin.territoryConfig().getBoolean("unstableClaimsDuringWar", true);
+                boolean overclaimable = plugin.guildPower().canOverclaimChunk(owner, key) && (!allowWarOverclaims || atWar);
                 if (!overclaimable) {
-                    sender.sendMessage("§cThat chunk is already claimed by " + owner.getName());
+                    sender.sendMessage("§7[§aGuild§7] §cThat chunk is already claimed by " + owner.getName() + "§c.");
                     return true;
                 }
                 owner.unclaimChunk(key);
