@@ -188,8 +188,6 @@ public final class GuildPowerService {
     }
 
     public boolean canOverclaimChunk(Guild attacker, Guild owner, String key) {
-        refreshUnstableClaims(owner);
-
         boolean atWar = attacker != null
                 && owner != null
                 && attacker.getEnemies().contains(owner.getId())
@@ -197,13 +195,21 @@ public final class GuildPowerService {
                 && attacker.isInWar()
                 && owner.isInWar();
 
-        if (!atWar) {
-            return false;
-        }
+        if (!atWar) return false;
 
+        // Hall is special: only vulnerable when protection is lost.
         if (owner.isHallChunk(key)) {
             return !isHallProtected(owner);
         }
+
+        // Non-hall: if owner is over-supported (claims > supported), any non-hall chunk is vulnerable.
+        int supported = getSupportedClaims(owner);
+        if (owner.getClaimedChunks().size() > supported) {
+            return true;
+        }
+
+        // Fallback to specific unstable selection (should be redundant when over-supported is true).
+        refreshUnstableClaims(owner);
         return owner.getUnstableClaims().contains(key);
     }
 
