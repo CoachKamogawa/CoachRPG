@@ -26,6 +26,8 @@ public final class GuildMaintenanceTask implements Runnable {
         long outOfFavorMs = TimeUnit.HOURS.toMillis(plugin.getConfig().getLong("alignment.out-of-alignment-grace-hours", 48));
 
         List<String> toDelete = new ArrayList<>();
+        List<String> hallTimeoutDelete = new ArrayList<>();
+
         for (Guild guild : plugin.storage().allGuilds()) {
             UUID masterId = findMaster(guild);
             if (masterId == null) {
@@ -92,8 +94,18 @@ public final class GuildMaintenanceTask implements Runnable {
             }
 
             if (!guild.isInWar()) {
+                long hallRequiredHours = Math.max(1L, plugin.territoryConfig().getLong("hallRequiredAfterHours", 48L));
+                long guildAgeMs = now - guild.getFoundedAtEpochMs();
+                if (!guild.hasHall() && guildAgeMs >= TimeUnit.HOURS.toMillis(hallRequiredHours)) {
+                    hallTimeoutDelete.add(guild.getId());
+                    continue;
+                }
+
                 double regenPerMinute = plugin.territoryConfig().getDouble("playerPowerRegenPerHour", 3.33) / 60.0;
                 for (UUID memberId : guild.getMembers().keySet()) {
+                    var online = Bukkit.getPlayer(memberId);
+                    if (online == null || !online.isOnline()) continue;
+
                     PlayerData memberPd = plugin.storage().getOrCreatePlayer(memberId);
                     double max = plugin.guildPower().playerPowerMax();
                     memberPd.setPower(Math.min(max, memberPd.getPower() + regenPerMinute));
@@ -107,16 +119,13 @@ public final class GuildMaintenanceTask implements Runnable {
         for (String guildId : toDelete) {
             Guild g = plugin.storage().getGuild(guildId);
             if (g == null) continue;
-            for (UUID memberId : new ArrayList<>(g.getMembers().keySet())) {
-                PlayerData pd = plugin.storage().getOrCreatePlayer(memberId);
-                if (guildId.equals(pd.getGuildId())) {
-                    pd.setGuildId(null);
-                    pd.setGuildTitle("");
-                    pd.setOutOfAlignmentSinceEpochMs(null);
-                }
-            }
-            plugin.storage().deleteGuild(guildId);
-            Bukkit.broadcastMessage(Text.color("&7[&aGuild&7] &cGuild disbanded due to inactivity: &r" + g.getName()));
+            plugin.guildPower().disbandGuild(g, "&7[&aGuild&7] &cGuild disbanded due to inactivity.");
+        }
+
+        for (String guildId : hallTimeoutDelete) {
+            Guild g = plugin.storage().getGuild(guildId);
+            if (g == null) continue;
+            plugin.guildPower().disbandGuild(g, "&7[&aGuild&7] &cYour guild did not claim a Guild Hall in time and has been disbanded.");
         }
 
         plugin.storage().save();
