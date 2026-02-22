@@ -66,7 +66,9 @@ public final class GuildPowerService {
     }
 
     public int allowedChunks(Guild guild) {
-        return allowedChunksForMembers(guild.getMembers().size());
+        int scalingCap = Math.max(9, allowedChunksForMembers(guild.getMembers().size()));
+        int effectiveByPower = Math.max(9, (int) Math.floor(guildPower(guild) / 2.0));
+        return Math.max(9, Math.min(scalingCap, effectiveByPower));
     }
 
     public int hallVulnerableThreshold(Guild guild) {
@@ -120,10 +122,15 @@ public final class GuildPowerService {
                     Comparator
                             .comparingDouble((String key) -> -distanceSqFromHall(key, hallWorld, cx, cz))
                             .thenComparingLong(key -> finalTs.getOrDefault(key, 0L))
+                            .thenComparing(key -> key)
             );
         } else {
             Map<String, Long> finalTs = ts;
-            candidates.sort(Comparator.comparingLong(key -> finalTs.getOrDefault(key, 0L)));
+            candidates.sort(
+                    Comparator
+                            .comparingLong((String key) -> finalTs.getOrDefault(key, 0L))
+                            .thenComparing(key -> key)
+            );
         }
 
         for (String key : candidates) {
