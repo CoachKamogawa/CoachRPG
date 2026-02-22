@@ -65,16 +65,28 @@ public final class GuildPowerService {
         return floor == null ? table.get(minKey) : floor.getValue();
     }
 
-    public int allowedChunks(Guild guild) {
-        int sizeCap = Math.max(9, allowedChunksForMembers(guild.getMembers().size()));
-        int baseline = 15;
-        double landCostPerChunk = plugin.territoryConfig().getDouble("landCostPerChunk", 2.0);
-        int powerChunks = landCostPerChunk <= 0.0
-                ? Integer.MAX_VALUE
-                : (int) Math.floor(guildPower(guild) / landCostPerChunk);
+    public AllowedClaimsBreakdown getAllowedClaimsBreakdown(Guild guild) {
+        int memberCount = guild.getMembers().size();
+        int scalingTableCap = Math.max(9, allowedChunksForMembers(memberCount));
+        double currentGuildPower = guildPower(guild);
 
-        int effectiveByPower = Math.max(9, Math.min(sizeCap, baseline + powerChunks));
-        return Math.min(sizeCap, effectiveByPower);
+        double landCostPerChunk = plugin.territoryConfig().getDouble("landCostPerChunk", 2.0);
+        int powerCap = landCostPerChunk <= 0.0
+                ? Integer.MAX_VALUE
+                : (int) Math.floor(currentGuildPower / landCostPerChunk);
+
+        int computedAllowedClaims = Math.max(9, Math.min(scalingTableCap, powerCap));
+        String formulaBranch = powerCap < scalingTableCap ? "POWER_LIMITED" : "SIZE_CAP_LIMITED";
+        return new AllowedClaimsBreakdown(memberCount, scalingTableCap, currentGuildPower, computedAllowedClaims, formulaBranch);
+    }
+
+    public int getAllowedClaims(Guild guild) {
+        return getAllowedClaimsBreakdown(guild).computedAllowedClaims();
+    }
+
+    @Deprecated
+    public int allowedChunks(Guild guild) {
+        return getAllowedClaims(guild);
     }
 
     public int hallVulnerableThreshold(Guild guild) {
@@ -102,7 +114,7 @@ public final class GuildPowerService {
     }
 
     public void refreshUnstableClaims(Guild guild) {
-        int excess = Math.max(0, guild.getClaimedChunks().size() - allowedChunks(guild));
+        int excess = Math.max(0, guild.getClaimedChunks().size() - getAllowedClaims(guild));
         guild.getUnstableClaims().clear();
         if (excess <= 0) return;
 
@@ -383,4 +395,12 @@ public final class GuildPowerService {
         plugin.storage().deleteGuild(guildId);
         Bukkit.broadcastMessage(Text.color("&7[&aGuild&7] &c" + guild.getName() + " &fhas been disbanded."));
     }
+
+    public record AllowedClaimsBreakdown(
+            int memberCount,
+            int scalingTableCap,
+            double currentGuildPower,
+            int computedAllowedClaims,
+            String formulaBranch
+    ) {}
 }
