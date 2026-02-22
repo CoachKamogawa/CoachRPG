@@ -182,7 +182,7 @@ public final class GuildCommand implements TabExecutor {
                 return true;
             }
 
-            int allowed = plugin.guildPower().getAllowedClaims(g);
+            int allowed = plugin.guildPower().getMaxClaims(g);
             Set<String> merged = new HashSet<>(g.getClaimedChunks());
             merged.addAll(hall);
             if (merged.size() > allowed) {
@@ -251,7 +251,7 @@ public final class GuildCommand implements TabExecutor {
                 return true;
             }
 
-            int allowed = plugin.guildPower().getAllowedClaims(g);
+            int allowed = plugin.guildPower().getMaxClaims(g);
             Set<String> projected = new HashSet<>(g.getClaimedChunks());
             projected.removeAll(oldHall);
             projected.addAll(newHall);
@@ -1917,7 +1917,7 @@ public final class GuildCommand implements TabExecutor {
     }
 
     private int maxClaims(Guild guild) {
-        return plugin.guildPower().getAllowedClaims(guild);
+        return plugin.guildPower().getMaxClaims(guild);
     }
 
     private Set<String> hallArea(String world, int centerX, int centerZ) {
@@ -1979,13 +1979,14 @@ public final class GuildCommand implements TabExecutor {
         int maxPower = plugin.guildPower().maxGuildPower(g);
         int claimsUsed = g.getClaimedChunks().size();
         var allowedClaims = plugin.guildPower().getAllowedClaimsBreakdown(g);
-        int claimsAllowed = allowedClaims.computedAllowedClaims();
+        int maxClaims = allowedClaims.maxClaims();
+        int supportedClaims = allowedClaims.supportedClaims();
 
         plugin.getLogger().info("[GUILD-INFO DEBUG] guild=" + g.getId()
                 + " memberCount=" + allowedClaims.memberCount()
-                + " scalingTableCap=" + allowedClaims.scalingTableCap()
+                + " maxClaims=" + allowedClaims.maxClaims()
                 + " currentGuildPower=" + fmt(allowedClaims.currentGuildPower())
-                + " computedAllowedClaims=" + allowedClaims.computedAllowedClaims()
+                + " supportedClaims=" + allowedClaims.supportedClaims()
                 + " formulaBranch=" + allowedClaims.formulaBranch());
 
         String hallStatus = "None";
@@ -2002,7 +2003,7 @@ public final class GuildCommand implements TabExecutor {
         viewer.sendMessage("§7Next tax: §f" + new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm").format(new java.util.Date(plugin.nextGuildTaxEpochMs())));
         viewer.sendMessage("§7Allies: §f" + formatGuildList(g.getAllies()));
         viewer.sendMessage("§7Enemies: §f" + formatGuildList(g.getEnemies()));
-        viewer.sendMessage("§7Claims: §f" + claimsUsed + "§7/§f" + claimsAllowed);
+        viewer.sendMessage("§7Claims: §f" + claimsUsed + "§7/§f" + maxClaims + " §8(supported: §f" + supportedClaims + "§8)");
         viewer.sendMessage("§7Hall Status: §f" + hallStatus);
         viewer.sendMessage("§7Guild Power: §f" + fmt(power) + "§7/§f" + maxPower);
         viewer.sendMessage("§8§m--------------------------------");
