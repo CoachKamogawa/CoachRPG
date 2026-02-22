@@ -307,6 +307,21 @@ public final class GuildCommand implements TabExecutor {
                     break;
                 }
             }
+            
+            int maxClaims = plugin.guildPower().getMaxClaims(g);
+            int supportedClaims = plugin.guildPower().getSupportedClaims(g);
+            int enforcedLimit = Math.min(maxClaims, supportedClaims);
+            int currentClaims = g.getClaimedChunks().size();
+            if (currentClaims >= enforcedLimit) {
+                if (supportedClaims <= maxClaims) {
+                    sender.sendMessage("§7[§aGuild§7] §cYour guild power only supports §e" + supportedClaims + "§c claims.");
+                    sender.sendMessage("§7Current: §e" + currentClaims + " §7/ Max Size Cap: §e" + maxClaims);
+                    sender.sendMessage("§7Regain power or unclaim land.");
+                } else {
+                    sender.sendMessage("§cGuild claim cap reached (§f" + maxClaims + "§c). Increase guild power.");
+                }
+                return true;
+            }
 
             if (owner != null) {
                 if (owner.getId().equals(g.getId())) {
@@ -338,12 +353,6 @@ public final class GuildCommand implements TabExecutor {
                 owner.addLogEntry("Lost claim at " + key + " to overclaim by " + g.getName());
                 plugin.guildPower().refreshUnstableClaims(owner);
                 plugin.guildPower().handlePowerThresholds(owner);
-            }
-
-            int max = maxClaims(g);
-            if (g.getClaimedChunks().size() >= max) {
-                sender.sendMessage("§cGuild claim cap reached (§f" + max + "§c). Increase guild power.");
-                return true;
             }
 
             g.claimChunk(key);
@@ -1914,10 +1923,6 @@ public final class GuildCommand implements TabExecutor {
             if (g != null) return g;
         }
         return plugin.storage().getGuild(Text.normalizeId(token));
-    }
-
-    private int maxClaims(Guild guild) {
-        return plugin.guildPower().getMaxClaims(guild);
     }
 
     private Set<String> hallArea(String world, int centerX, int centerZ) {
