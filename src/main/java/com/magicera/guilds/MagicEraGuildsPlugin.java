@@ -29,8 +29,11 @@ import org.bukkit.command.TabCompleter;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.plugin.java.JavaPlugin;
+import org.bukkit.scheduler.BukkitTask;
 
 import java.io.File;
+import java.util.ArrayList;
+import java.util.List;
 
 public final class MagicEraGuildsPlugin extends JavaPlugin {
 
@@ -48,6 +51,11 @@ public final class MagicEraGuildsPlugin extends JavaPlugin {
     private YamlConfiguration territoryConfig;
     private long nextGuildTaxEpochMs;
 
+    private BukkitTask autoSaveTask;
+    private BukkitTask guildTaxTask;
+    private BukkitTask alignmentWarningTask;
+    private BukkitTask guildMaintenanceTask;
+
     public Storage storage() { return storage; }
     public AlignmentWatcher alignmentWatcher() { return alignmentWatcher; }
     public InviteManager inviteManager() { return inviteManager; }
@@ -61,13 +69,7 @@ public final class MagicEraGuildsPlugin extends JavaPlugin {
     @Override
     public void onEnable() {
         try {
-            saveDefaultConfig();
-
-            if (!new File(getDataFolder(), "territory.yml").exists()) {
-                saveResource("territory.yml", false);
-            }
-            territoryFile = new File(getDataFolder(), "territory.yml");
-            territoryConfig = YamlConfiguration.loadConfiguration(territoryFile);
+            reloadPluginConfigs();
 
             storage = new Storage(this);
             storage.load();
@@ -79,9 +81,6 @@ public final class MagicEraGuildsPlugin extends JavaPlugin {
             economyHook = new EconomyHook();
             guildPower = new GuildPowerService(this);
             boolean econOk = economyHook.setup();
-
-            long now = System.currentTimeMillis();
-            nextGuildTaxEpochMs = getConfig().getLong("economy.next-guild-tax-epoch-ms", now + WEEK_MS);
 
             // Commands
             registerCmd("guild", new GuildCommand(this));
@@ -99,27 +98,7 @@ public final class MagicEraGuildsPlugin extends JavaPlugin {
             alignmentWatcher = new AlignmentWatcher(this);
             Bukkit.getPluginManager().registerEvents(new JoinListener(alignmentWatcher), this);
 
-            // Auto-save
-            int intervalSeconds = Math.max(30, getConfig().getInt("data.save-interval-seconds", 120));
-            Bukkit.getScheduler().runTaskTimerAsynchronously(this, () -> {
-                try { storage.save(); } catch (Exception ignored) {}
-            }, 20L * intervalSeconds, 20L * intervalSeconds);
-
-            // Weekly guild tax check (runs every minute)
-            Bukkit.getScheduler().runTaskTimer(this, () -> {
-                long current = System.currentTimeMillis();
-                if (current < nextGuildTaxEpochMs) return;
-                runGuildTaxCycle(Bukkit.getConsoleSender(), false);
-            }, 20L * 60L, 20L * 60L);
-
-            // Alignment warnings
-            int warnMinutes = Math.max(1, getConfig().getInt("alignment.warn-interval-minutes", 30));
-            Bukkit.getScheduler().runTaskTimer(this, alignmentWatcher,
-                    20L * 60L * warnMinutes,
-                    20L * 60L * warnMinutes);
-
-            // Guild maintenance (auto-disband, auto-master, impeachment checks, power + warnings)
-            Bukkit.getScheduler().runTaskTimer(this, new GuildMaintenanceTask(this), 20L * 60L, 20L * 60L);
+            startRecurringTasks();
 
             getLogger().info("====================================");
             getLogger().info("MagicEraGuilds loaded successfully");
@@ -137,6 +116,67 @@ public final class MagicEraGuildsPlugin extends JavaPlugin {
                     (e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage()));
             Bukkit.getPluginManager().disablePlugin(this);
         }
+    }
+
+    public void reloadPluginConfigs() {
+        reloadConfig();
+        saveDefaultConfig();
+
+        if (!new File(getDataFolder(), "territory.yml").exists()) {
+            saveResource("territory.yml", false);
+        }
+        territoryFile = new File(getDataFolder(), "territory.yml");
+        territoryConfig = YamlConfiguration.loadConfiguration(territoryFile);
+
+        long now = System.currentTimeMillis();
+        nextGuildTaxEpochMs = getConfig().getLong("economy.next-guild-tax-epoch-ms", now + WEEK_MS);
+    }
+
+    public List<String> resetAndReloadPluginConfigs() {
+        List<String> deletedFiles = new ArrayList<>();
+
+        // stop any running tasks first
+        Bukkit.getScheduler().cancelTasks(this);
+
+        File dataFolder = getDataFolder();
+        File[] configFiles = new File[] {
+                new File(dataFolder, "config.yml"),
+                new File(dataFolder, "territory.yml")
+        };
+
+        for (File configFile : configFiles) {
+            if (configFile.exists() && configFile.delete()) {
+                deletedFiles.add(configFile.getName());
+            }
+        }
+
+        reloadPluginConfigs();
+
+        if (guildPower != null) guildPower.clampAllPowers();
+        if (storage != null) storage.save();
+
+        startRecurringTasks();
+        return deletedFiles;
+    }
+
+    private void startRecurringTasks() {
+        int intervalSeconds = Math.max(30, getConfig().getInt("data.save-interval-seconds", 120));
+        autoSaveTask = Bukkit.getScheduler().runTaskTimerAsynchronously(this, () -> {
+            try { storage.save(); } catch (Exception ignored) {}
+        }, 20L * intervalSeconds, 20L * intervalSeconds);
+
+        guildTaxTask = Bukkit.getScheduler().runTaskTimer(this, () -> {
+            long current = System.currentTimeMillis();
+            if (current < nextGuildTaxEpochMs) return;
+            runGuildTaxCycle(Bukkit.getConsoleSender(), false);
+        }, 20L * 60L, 20L * 60L);
+
+        int warnMinutes = Math.max(1, getConfig().getInt("alignment.warn-interval-minutes", 30));
+        alignmentWarningTask = Bukkit.getScheduler().runTaskTimer(this, alignmentWatcher,
+                20L * 60L * warnMinutes,
+                20L * 60L * warnMinutes);
+
+        guildMaintenanceTask = Bukkit.getScheduler().runTaskTimer(this, new GuildMaintenanceTask(this), 20L * 60L, 20L * 60L);
     }
 
     public void runGuildTaxCycle(CommandSender initiator, boolean forced) {
@@ -197,6 +237,11 @@ public final class MagicEraGuildsPlugin extends JavaPlugin {
 
     @Override
     public void onDisable() {
+        if (autoSaveTask != null) autoSaveTask.cancel();
+        if (guildTaxTask != null) guildTaxTask.cancel();
+        if (alignmentWarningTask != null) alignmentWarningTask.cancel();
+        if (guildMaintenanceTask != null) guildMaintenanceTask.cancel();
+
         if (territoryConfig != null && territoryFile != null) {
             try { territoryConfig.save(territoryFile); } catch (Exception ignored) {}
         }
