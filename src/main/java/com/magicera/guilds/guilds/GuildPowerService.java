@@ -66,9 +66,15 @@ public final class GuildPowerService {
     }
 
     public int allowedChunks(Guild guild) {
-        int scalingCap = Math.max(9, allowedChunksForMembers(guild.getMembers().size()));
-        int effectiveByPower = Math.max(9, (int) Math.floor(guildPower(guild) / 2.0));
-        return Math.max(9, Math.min(scalingCap, effectiveByPower));
+        int sizeCap = Math.max(9, allowedChunksForMembers(guild.getMembers().size()));
+        int baseline = 15;
+        double landCostPerChunk = plugin.territoryConfig().getDouble("landCostPerChunk", 2.0);
+        int powerChunks = landCostPerChunk <= 0.0
+                ? Integer.MAX_VALUE
+                : (int) Math.floor(guildPower(guild) / landCostPerChunk);
+
+        int effectiveByPower = Math.max(9, Math.min(sizeCap, baseline + powerChunks));
+        return Math.min(sizeCap, effectiveByPower);
     }
 
     public int hallVulnerableThreshold(Guild guild) {
