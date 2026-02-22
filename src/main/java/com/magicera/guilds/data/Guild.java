@@ -251,13 +251,42 @@ public final class Guild {
     public Integer getHallCenterX() { return hallCenterX; }
     public Integer getHallCenterZ() { return hallCenterZ; }
 
-    public boolean hasHall() { return hasHall; }
+    public boolean hasHall() { return hasHall || hasHallMetadata(); }
     public void setHasHall(boolean hasHall) { this.hasHall = hasHall; }
 
     public Long getHallLastMovedAtEpochMs() { return hallLastMovedAtEpochMs; }
     public void setHallLastMovedAtEpochMs(Long hallLastMovedAtEpochMs) { this.hallLastMovedAtEpochMs = hallLastMovedAtEpochMs; }
 
     public Set<String> getHallChunks() { return hallChunks; }
+
+    public boolean hasHallMetadata() {
+        return hallWorld != null && hallCenterX != null && hallCenterZ != null;
+    }
+
+    public Set<String> getHallChunkSet() {
+        if (!hasHallMetadata()) return Collections.emptySet();
+        Set<String> chunks = new HashSet<>(9);
+        for (int x = hallCenterX - 1; x <= hallCenterX + 1; x++) {
+            for (int z = hallCenterZ - 1; z <= hallCenterZ + 1; z++) {
+                chunks.add(chunkKey(hallWorld, x, z));
+            }
+        }
+        return chunks;
+    }
+
+    public boolean isHallChunk(String key) {
+        if (key == null || !hasHallMetadata()) return false;
+        String[] parts = key.split(":");
+        if (parts.length != 3) return false;
+        if (!hallWorld.equals(parts[0])) return false;
+        try {
+            int x = Integer.parseInt(parts[1]);
+            int z = Integer.parseInt(parts[2]);
+            return Math.abs(x - hallCenterX) <= 1 && Math.abs(z - hallCenterZ) <= 1;
+        } catch (NumberFormatException ex) {
+            return false;
+        }
+    }
 
     public Set<String> getAllies() { return allies; }
     public Set<String> getEnemies() { return enemies; }
@@ -278,6 +307,7 @@ public final class Guild {
         this.hasHall = true;
         this.hallChunks.clear();
         if (chunks != null) this.hallChunks.addAll(chunks);
+        if (this.hallChunks.isEmpty()) this.hallChunks.addAll(getHallChunkSet());
     }
 
     public void clearHall() {
