@@ -244,7 +244,7 @@ public final class GuildCommand implements TabExecutor {
             int cx = player.getChunk().getX();
             int cz = player.getChunk().getZ();
             Set<String> newHall = hallArea(world, cx, cz);
-            Set<String> oldHall = new HashSet<>(g.getHallChunkSet());
+            Set<String> oldHall = new HashSet<>(g.getHallChunks());
 
             if (!isHallAreaAvailable(g, newHall, oldHall)) {
                 sender.sendMessage("§7[§aGuild§7] §cGuild Hall move failed because part of the 3x3 is already claimed.");
