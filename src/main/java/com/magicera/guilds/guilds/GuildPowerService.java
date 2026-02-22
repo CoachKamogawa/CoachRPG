@@ -10,6 +10,7 @@ import org.bukkit.entity.Player;
 import java.util.*;
 
 public final class GuildPowerService {
+
     private final MagicEraGuildsPlugin plugin;
 
     public GuildPowerService(MagicEraGuildsPlugin plugin) {
@@ -72,9 +73,11 @@ public final class GuildPowerService {
     public int hallVulnerableThreshold(Guild guild) {
         int fixedCount = plugin.territoryConfig().getInt("fixedThresholdMemberCount", 15);
         double pct = plugin.territoryConfig().getDouble("hallVulnerablePercentUnderOrEqual15", 0.15);
+
         if (guild.getMembers().size() <= fixedCount) {
             return (int) Math.ceil(maxGuildPower(guild) * pct);
         }
+
         int fixedMax = fixedCount * (int) Math.ceil(playerPowerMax());
         return (int) Math.ceil(fixedMax * pct);
     }
@@ -82,9 +85,11 @@ public final class GuildPowerService {
     public int hallAtRiskThreshold(Guild guild) {
         int fixedCount = plugin.territoryConfig().getInt("fixedThresholdMemberCount", 15);
         double pct = plugin.territoryConfig().getDouble("hallAtRiskPercentUnderOrEqual15", 0.20);
+
         if (guild.getMembers().size() <= fixedCount) {
             return (int) Math.ceil(maxGuildPower(guild) * pct);
         }
+
         int fixedMax = fixedCount * (int) Math.ceil(playerPowerMax());
         return (int) Math.ceil(fixedMax * pct);
     }
@@ -100,7 +105,6 @@ public final class GuildPowerService {
 
         List<String> candidates = new ArrayList<>(guild.getClaimedChunks());
 
-        // claim timestamp sorting (oldest becomes unstable first) with hall-distance preference if hall exists
         Map<String, Long> ts = guild.getClaimTimestamps();
         if (ts == null) ts = Collections.emptyMap();
 
@@ -129,6 +133,7 @@ public final class GuildPowerService {
     private double distanceSqFromHall(String key, String hallWorld, int cx, int cz) {
         String[] p = key.split(":");
         if (p.length != 3 || !hallWorld.equals(p[0])) return Double.MAX_VALUE;
+
         try {
             int x = Integer.parseInt(p[1]);
             int z = Integer.parseInt(p[2]);
@@ -143,10 +148,10 @@ public final class GuildPowerService {
     public boolean canOverclaimChunk(Guild owner, String key) {
         refreshUnstableClaims(owner);
 
-        // Hall chunk protection should only apply if the guild actually has a hall.
         if (owner.hasHall() && owner.getHallChunks().contains(key) && isHallProtected(owner)) {
             return false;
         }
+
         return owner.getUnstableClaims().contains(key);
     }
 
@@ -179,7 +184,6 @@ public final class GuildPowerService {
             return;
         }
 
-        // Only disband for 0 land if they had actually established a hall (i.e., they progressed into territory gameplay).
         if (claims <= 0) {
             if (guild.hasHall()) {
                 disbandGuild(guild, "&7[&aGuild&7] &cYour guild has lost all territory and has been disbanded.");
@@ -188,68 +192,55 @@ public final class GuildPowerService {
         }
 
         int lowClaimsThreshold = plugin.territoryConfig().getInt("lowClaimsThreshold", 3);
-        maybeWarn(guild, "lowClaims", claims <= lowClaimsThreshold,
-                "&7[&aGuild&7] &cYour guild controls only &e" + claims + " &cremaining claims. Losing all territory will result in disband.", now);
+        maybeWarn(
+                guild,
+                "lowClaims",
+                claims <= lowClaimsThreshold,
+                "&7[&aGuild&7] &cYour guild controls only &e" + claims +
+                        " &cremaining claims. Losing all territory will result in disband.",
+                now
+        );
 
         if (!guild.isInWar()) return;
+
+        String wearinessTier = currentWearinessTier(power, max);
+
+        if ("collapse10".equals(wearinessTier)) {
+            maybeWarnChannel(
+                    guild, "weariness", "collapse10",
+                    "&7[&aGuild&7] &cYour guild is below &e10% &cpower. You are on the verge of collapse. If power reaches &e0&c, the guild will disband.",
+                    now, loginTarget
+            );
+        } else if ("critical25".equals(wearinessTier)) {
+            maybeWarnChannel(
+                    guild, "weariness", "critical25",
+                    "&7[&aGuild&7] &cYour guild is below &e25% &cpower. Continued losses will begin threatening your territory.",
+                    now, loginTarget
+            );
+        } else if ("warWeariness50".equals(wearinessTier)) {
+            maybeWarnChannel(
+                    guild, "weariness", "warWeariness50",
+                    "&7[&aGuild&7] &cYour guild has fallen below &e50% &cpower, and casualties are increasing. Consider seeking a truce.",
+                    now, loginTarget
+            );
+        }
 
         int atRisk = hallAtRiskThreshold(guild);
         int vulnerable = hallVulnerableThreshold(guild);
 
-        // Hall: only send the *current* tier (not both).
         String hallTier = currentHallTier(power, atRisk, vulnerable);
-
-        // Weariness: only send the *current* tier (not multiple tiers).
-        // Once the hall becomes vulnerable and overclaimable, suppress general weariness warnings.
-        if (!"hallVulnerable".equals(hallTier)) {
-            String wearinessTier = currentWearinessTier(power, max);
-            if ("collapse10".equals(wearinessTier)) {
-                maybeWarnChannel(
-                        guild,
-                        "weariness",
-                        "collapse10",
-                        "&7[&aGuild&7] &cYour guild is below &e10% &cpower. You are on the verge of collapse. If power reaches &e0&c, the guild will disband.",
-                        now,
-                        loginTarget
-                );
-            } else if ("critical25".equals(wearinessTier)) {
-                maybeWarnChannel(
-                        guild,
-                        "weariness",
-                        "critical25",
-                        "&7[&aGuild&7] &cYour guild is below &e25% &cpower. Continued losses will begin threatening your territory.",
-                        now,
-                        loginTarget
-                );
-            } else if ("warWeariness50".equals(wearinessTier)) {
-                maybeWarnChannel(
-                        guild,
-                        "weariness",
-                        "warWeariness50",
-                        "&7[&aGuild&7] &cYour guild has fallen below &e50% &cpower, and casualties are increasing. Consider seeking a truce.",
-                        now,
-                        loginTarget
-                );
-            }
-        }
 
         if ("hallVulnerable".equals(hallTier)) {
             maybeWarnChannel(
-                    guild,
-                    "hall",
-                    "hallVulnerable",
+                    guild, "hall", "hallVulnerable",
                     "&7[&aGuild&7] &cYour guild is at threat of collapse. The Guild Hall is no longer secure and can now be overclaimed.",
-                    now,
-                    loginTarget
+                    now, loginTarget
             );
         } else if ("hallAtRisk".equals(hallTier)) {
             maybeWarnChannel(
-                    guild,
-                    "hall",
-                    "hallAtRisk",
+                    guild, "hall", "hallAtRisk",
                     "&7[&aGuild&7] &cYour Guild Hall is at risk. You are close to losing protection.",
-                    now,
-                    loginTarget
+                    now, loginTarget
             );
         }
     }
@@ -267,18 +258,12 @@ public final class GuildPowerService {
         return null;
     }
 
-    private void maybeWarnChannel(Guild guild,
-                                 String channel,
-                                 String tier,
-                                 String message,
-                                 long now,
-                                 Player loginTarget) {
+    private void maybeWarnChannel(Guild guild, String channel, String tier, String message, long now, Player loginTarget) {
         if (!plugin.territoryConfig().getBoolean("warningTiers." + tier, true)) return;
 
-        long cooldownMs = Math.max(1, plugin.territoryConfig().getLong("warningCooldownMinutes", 15)) * 60_000L;
+        long cooldownMs = Math.max(1,
+                plugin.territoryConfig().getLong("warningCooldownMinutes", 15)) * 60_000L;
 
-        // Login warnings should respect cooldown per-member, so players still get alerts when they come online,
-        // without bypassing the configured cooldown for everyone.
         if (loginTarget != null) {
             String perMemberKey = channel + "Cooldown:" + loginTarget.getUniqueId();
             long last = guild.getWarningLastSent().getOrDefault(perMemberKey, 0L);
@@ -301,12 +286,16 @@ public final class GuildPowerService {
         if (!condition) return;
         if (!plugin.territoryConfig().getBoolean("warningTiers." + tier, true)) return;
 
-        long cooldownMs = Math.max(1, plugin.territoryConfig().getLong("warningCooldownMinutes", 15)) * 60_000L;
+        long cooldownMs = Math.max(1,
+                plugin.territoryConfig().getLong("warningCooldownMinutes", 15)) * 60_000L;
+
         long last = guild.getWarningLastSent().getOrDefault(tier, 0L);
 
-        if (guild.isInWar() && guild.getWarSessionId() != null && guild.getWarningSentWarSession().contains(tier)) {
+        if (guild.isInWar() && guild.getWarSessionId() != null &&
+                guild.getWarningSentWarSession().contains(tier)) {
             return;
         }
+
         if ((now - last) < cooldownMs) return;
 
         sendGuildMessage(guild, message);
@@ -329,16 +318,22 @@ public final class GuildPowerService {
 
     public void disbandGuild(Guild guild, String personalMessage) {
         String guildId = guild.getId();
+
         for (UUID memberId : new ArrayList<>(guild.getMembers().keySet())) {
             PlayerData pd = plugin.storage().getOrCreatePlayer(memberId);
+
             if (guildId.equals(pd.getGuildId())) {
                 pd.setGuildId(null);
                 pd.setGuildTitle("");
                 pd.setOutOfAlignmentSinceEpochMs(null);
             }
+
             Player online = Bukkit.getPlayer(memberId);
-            if (online != null) online.sendMessage(Text.color(personalMessage));
+            if (online != null) {
+                online.sendMessage(Text.color(personalMessage));
+            }
         }
+
         plugin.storage().deleteGuild(guildId);
         Bukkit.broadcastMessage(Text.color("&7[&aGuild&7] &c" + guild.getName() + " &fhas been disbanded."));
     }
