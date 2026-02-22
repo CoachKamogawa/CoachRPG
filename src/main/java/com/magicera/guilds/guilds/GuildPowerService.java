@@ -264,24 +264,32 @@ public final class GuildPowerService {
     }
 
     private void maybeWarnChannel(Guild guild,
-                                  String channel,
-                                  String tier,
-                                  String message,
-                                  long now,
-                                  Player loginTarget) {
+                                 String channel,
+                                 String tier,
+                                 String message,
+                                 long now,
+                                 Player loginTarget) {
         if (!plugin.territoryConfig().getBoolean("warningTiers." + tier, true)) return;
 
         long cooldownMs = Math.max(1, plugin.territoryConfig().getLong("warningCooldownMinutes", 15)) * 60_000L;
+
+        // Login warnings should respect cooldown per-member, so players still get alerts when they come online,
+        // without bypassing the configured cooldown for everyone.
+        if (loginTarget != null) {
+            String perMemberKey = channel + "Cooldown:" + loginTarget.getUniqueId();
+            long last = guild.getWarningLastSent().getOrDefault(perMemberKey, 0L);
+            if ((now - last) < cooldownMs) return;
+
+            loginTarget.sendMessage(Text.color(message));
+            guild.getWarningLastSent().put(perMemberKey, now);
+            return;
+        }
+
         String channelKey = channel + "Cooldown";
         long last = guild.getWarningLastSent().getOrDefault(channelKey, 0L);
         if ((now - last) < cooldownMs) return;
 
-        if (loginTarget != null) {
-            loginTarget.sendMessage(Text.color(message));
-        } else {
-            sendGuildMessage(guild, message);
-        }
-
+        sendGuildMessage(guild, message);
         guild.getWarningLastSent().put(channelKey, now);
     }
 
