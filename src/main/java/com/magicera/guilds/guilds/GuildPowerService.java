@@ -56,7 +56,7 @@ public final class GuildPowerService {
 
         int minKey = table.firstKey();
         int maxKey = table.lastKey();
-        int effective = Math.max(3, memberCount);
+        int effective = Math.max(1, memberCount);
 
         if (effective <= minKey) return table.get(minKey);
         if (effective >= maxKey) return table.get(maxKey);
@@ -67,26 +67,38 @@ public final class GuildPowerService {
 
     public AllowedClaimsBreakdown getAllowedClaimsBreakdown(Guild guild) {
         int memberCount = guild.getMembers().size();
-        int scalingTableCap = Math.max(9, allowedChunksForMembers(memberCount));
+        int maxClaims = Math.max(9, allowedChunksForMembers(memberCount));
         double currentGuildPower = guildPower(guild);
 
         double landCostPerChunk = plugin.territoryConfig().getDouble("landCostPerChunk", 2.0);
-        int powerCap = landCostPerChunk <= 0.0
-                ? Integer.MAX_VALUE
-                : (int) Math.floor(currentGuildPower / landCostPerChunk);
+        int supportedClaims;
+        if (landCostPerChunk <= 0.0) {
+            supportedClaims = maxClaims;
+        } else {
+            int powerCap = (int) Math.floor(currentGuildPower / landCostPerChunk);
+            supportedClaims = Math.max(9, Math.min(maxClaims, powerCap));
+        }
 
-        int computedAllowedClaims = Math.max(9, Math.min(scalingTableCap, powerCap));
-        String formulaBranch = powerCap < scalingTableCap ? "POWER_LIMITED" : "SIZE_CAP_LIMITED";
-        return new AllowedClaimsBreakdown(memberCount, scalingTableCap, currentGuildPower, computedAllowedClaims, formulaBranch);
+        String formulaBranch = supportedClaims < maxClaims ? "POWER_UNDER_SUPPORTED" : "FULLY_SUPPORTED";
+        return new AllowedClaimsBreakdown(memberCount, maxClaims, currentGuildPower, supportedClaims, formulaBranch);
     }
 
+    public int getMaxClaims(Guild guild) {
+        return getAllowedClaimsBreakdown(guild).maxClaims();
+    }
+
+    public int getSupportedClaims(Guild guild) {
+        return getAllowedClaimsBreakdown(guild).supportedClaims();
+    }
+
+    @Deprecated
     public int getAllowedClaims(Guild guild) {
-        return getAllowedClaimsBreakdown(guild).computedAllowedClaims();
+        return getMaxClaims(guild);
     }
 
     @Deprecated
     public int allowedChunks(Guild guild) {
-        return getAllowedClaims(guild);
+        return getMaxClaims(guild);
     }
 
     public int hallVulnerableThreshold(Guild guild) {
@@ -114,7 +126,7 @@ public final class GuildPowerService {
     }
 
     public void refreshUnstableClaims(Guild guild) {
-        int excess = Math.max(0, guild.getClaimedChunks().size() - getAllowedClaims(guild));
+        int excess = Math.max(0, guild.getClaimedChunks().size() - getSupportedClaims(guild));
         guild.getUnstableClaims().clear();
         if (excess <= 0) return;
 
@@ -398,9 +410,9 @@ public final class GuildPowerService {
 
     public record AllowedClaimsBreakdown(
             int memberCount,
-            int scalingTableCap,
+            int maxClaims,
             double currentGuildPower,
-            int computedAllowedClaims,
+            int supportedClaims,
             String formulaBranch
     ) {}
 }
