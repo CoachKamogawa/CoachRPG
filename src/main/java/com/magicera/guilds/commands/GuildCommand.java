@@ -244,7 +244,7 @@ public final class GuildCommand implements TabExecutor {
             int cx = player.getChunk().getX();
             int cz = player.getChunk().getZ();
             Set<String> newHall = hallArea(world, cx, cz);
-            Set<String> oldHall = new HashSet<>(g.getHallChunks());
+            Set<String> oldHall = new HashSet<>(g.getHallChunkSet());
 
             if (!isHallAreaAvailable(g, newHall, oldHall)) {
                 sender.sendMessage("§7[§aGuild§7] §cGuild Hall move failed because part of the 3x3 is already claimed.");
@@ -317,7 +317,6 @@ public final class GuildCommand implements TabExecutor {
                     return true;
                 }
                 owner.unclaimChunk(key);
-                if (owner.getHallChunks().contains(key)) owner.clearHall();
                 owner.addLogEntry("Lost claim at " + key + " to overclaim by " + g.getName());
                 plugin.guildPower().refreshUnstableClaims(owner);
                 plugin.guildPower().handlePowerThresholds(owner);
@@ -369,9 +368,6 @@ public final class GuildCommand implements TabExecutor {
             if (!g.unclaimChunk(key)) {
                 sender.sendMessage("§cThis chunk is not claimed by your guild.");
                 return true;
-            }
-            if (g.getHallChunks().contains(key)) {
-                g.clearHall();
             }
             g.addLogEntry("Unclaimed land at " + key + " by " + player.getName());
             plugin.guildPower().refreshUnstableClaims(g);
