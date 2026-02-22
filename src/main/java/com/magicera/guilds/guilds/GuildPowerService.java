@@ -69,16 +69,6 @@ public final class GuildPowerService {
         return allowedChunksForMembers(guild.getMembers().size());
     }
 
-    public int allowedChunksByPower(Guild guild) {
-        double landCostPerChunk = plugin.territoryConfig().getDouble("landCostPerChunk", 2.0);
-        if (landCostPerChunk <= 0.0) return Integer.MAX_VALUE;
-        return Math.max(0, (int) Math.floor(guildPower(guild) / landCostPerChunk));
-    }
-
-    public int maxClaimableChunks(Guild guild) {
-        return Math.min(allowedChunks(guild), allowedChunksByPower(guild));
-    }
-
     public int hallVulnerableThreshold(Guild guild) {
         int fixedCount = plugin.territoryConfig().getInt("fixedThresholdMemberCount", 15);
         double pct = plugin.territoryConfig().getDouble("hallVulnerablePercentUnderOrEqual15", 0.15);
@@ -104,7 +94,7 @@ public final class GuildPowerService {
     }
 
     public void refreshUnstableClaims(Guild guild) {
-        int excess = Math.max(0, guild.getClaimedChunks().size() - maxClaimableChunks(guild));
+        int excess = Math.max(0, guild.getClaimedChunks().size() - allowedChunks(guild));
         guild.getUnstableClaims().clear();
         if (excess <= 0) return;
 
@@ -154,9 +144,8 @@ public final class GuildPowerService {
         refreshUnstableClaims(owner);
 
         // Hall chunk protection should only apply if the guild actually has a hall.
-        // Once hall protection drops (vulnerable threshold), hall chunks are explicitly overclaimable.
-        if (owner.hasHall() && owner.getHallChunks().contains(key)) {
-            return !isHallProtected(owner);
+        if (owner.hasHall() && owner.getHallChunks().contains(key) && isHallProtected(owner)) {
+            return false;
         }
         return owner.getUnstableClaims().contains(key);
     }
@@ -287,35 +276,25 @@ public final class GuildPowerService {
         if (!plugin.territoryConfig().getBoolean("warningTiers." + tier, true)) return;
 
         long cooldownMs = Math.max(1, plugin.territoryConfig().getLong("warningCooldownMinutes", 15)) * 60_000L;
-        String warTierKey = "war:" + channel + ":" + tier;
-        boolean tierAlreadySentThisWar = guild.getWarningSentWarSession().contains(warTierKey);
 
-        // Login warnings should respect cooldown per-member for repeated reminders.
-        // First-time threshold alerts in a war session should still fire immediately.
+        // Login warnings should respect cooldown per-member, so players still get alerts when they come online,
+        // without bypassing the configured cooldown for everyone.
         if (loginTarget != null) {
             String perMemberKey = channel + "Cooldown:" + loginTarget.getUniqueId();
             long last = guild.getWarningLastSent().getOrDefault(perMemberKey, 0L);
-            boolean allowByCooldown = (now - last) >= cooldownMs;
-            if (!allowByCooldown && tierAlreadySentThisWar) return;
+            if ((now - last) < cooldownMs) return;
 
             loginTarget.sendMessage(Text.color(message));
             guild.getWarningLastSent().put(perMemberKey, now);
-            if (guild.isInWar() && guild.getWarSessionId() != null) {
-                guild.getWarningSentWarSession().add(warTierKey);
-            }
             return;
         }
 
         String channelKey = channel + "Cooldown";
         long last = guild.getWarningLastSent().getOrDefault(channelKey, 0L);
-        boolean allowByCooldown = (now - last) >= cooldownMs;
-        if (!allowByCooldown && tierAlreadySentThisWar) return;
+        if ((now - last) < cooldownMs) return;
 
         sendGuildMessage(guild, message);
         guild.getWarningLastSent().put(channelKey, now);
-        if (guild.isInWar() && guild.getWarSessionId() != null) {
-            guild.getWarningSentWarSession().add(warTierKey);
-        }
     }
 
     private void maybeWarn(Guild guild, String tier, boolean condition, String message, long now) {
@@ -344,9 +323,6 @@ public final class GuildPowerService {
             Player p = Bukkit.getPlayer(memberId);
             if (p != null && p.isOnline()) {
                 p.sendMessage(colored);
-            } else {
-                PlayerData pd = plugin.storage().getOrCreatePlayer(memberId);
-                pd.getPendingGuildMessages().add(colored);
             }
         }
     }
