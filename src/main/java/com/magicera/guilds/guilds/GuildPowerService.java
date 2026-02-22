@@ -154,8 +154,9 @@ public final class GuildPowerService {
         refreshUnstableClaims(owner);
 
         // Hall chunk protection should only apply if the guild actually has a hall.
-        if (owner.hasHall() && owner.getHallChunks().contains(key) && isHallProtected(owner)) {
-            return false;
+        // Once hall protection drops (vulnerable threshold), hall chunks are explicitly overclaimable.
+        if (owner.hasHall() && owner.getHallChunks().contains(key)) {
+            return !isHallProtected(owner);
         }
         return owner.getUnstableClaims().contains(key);
     }
@@ -286,25 +287,35 @@ public final class GuildPowerService {
         if (!plugin.territoryConfig().getBoolean("warningTiers." + tier, true)) return;
 
         long cooldownMs = Math.max(1, plugin.territoryConfig().getLong("warningCooldownMinutes", 15)) * 60_000L;
+        String warTierKey = "war:" + channel + ":" + tier;
+        boolean tierAlreadySentThisWar = guild.getWarningSentWarSession().contains(warTierKey);
 
-        // Login warnings should respect cooldown per-member, so players still get alerts when they come online,
-        // without bypassing the configured cooldown for everyone.
+        // Login warnings should respect cooldown per-member for repeated reminders.
+        // First-time threshold alerts in a war session should still fire immediately.
         if (loginTarget != null) {
             String perMemberKey = channel + "Cooldown:" + loginTarget.getUniqueId();
             long last = guild.getWarningLastSent().getOrDefault(perMemberKey, 0L);
-            if ((now - last) < cooldownMs) return;
+            boolean allowByCooldown = (now - last) >= cooldownMs;
+            if (!allowByCooldown && tierAlreadySentThisWar) return;
 
             loginTarget.sendMessage(Text.color(message));
             guild.getWarningLastSent().put(perMemberKey, now);
+            if (guild.isInWar() && guild.getWarSessionId() != null) {
+                guild.getWarningSentWarSession().add(warTierKey);
+            }
             return;
         }
 
         String channelKey = channel + "Cooldown";
         long last = guild.getWarningLastSent().getOrDefault(channelKey, 0L);
-        if ((now - last) < cooldownMs) return;
+        boolean allowByCooldown = (now - last) >= cooldownMs;
+        if (!allowByCooldown && tierAlreadySentThisWar) return;
 
         sendGuildMessage(guild, message);
         guild.getWarningLastSent().put(channelKey, now);
+        if (guild.isInWar() && guild.getWarSessionId() != null) {
+            guild.getWarningSentWarSession().add(warTierKey);
+        }
     }
 
     private void maybeWarn(Guild guild, String tier, boolean condition, String message, long now) {
@@ -333,6 +344,9 @@ public final class GuildPowerService {
             Player p = Bukkit.getPlayer(memberId);
             if (p != null && p.isOnline()) {
                 p.sendMessage(colored);
+            } else {
+                PlayerData pd = plugin.storage().getOrCreatePlayer(memberId);
+                pd.getPendingGuildMessages().add(colored);
             }
         }
     }
