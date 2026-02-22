@@ -105,10 +105,22 @@ public final class Storage {
                 guild.setWarSessionId(warSessionId == 0L ? null : warSessionId);
 
                 guild.getClaimedChunks().addAll(s.getStringList("claimedChunks"));
+
+                ConfigurationSection claimTs = s.getConfigurationSection("claimTimestamps");
+                if (claimTs != null) {
+                    for (String key : claimTs.getKeys(false)) {
+                        String decoded = key.replace("%2E", ".");
+                        guild.getClaimTimestamps().put(decoded, claimTs.getLong(key, 0L));
+                    }
+                }
+
                 guild.getUnstableClaims().addAll(s.getStringList("unstableClaims"));
 
                 String hallWorld = s.getString("hall.world");
                 guild.setHasHall(s.getBoolean("hall.hasHall", false));
+                long hallLastMoved = s.getLong("hall.lastMovedAtEpochMs", 0L);
+                guild.setHallLastMovedAtEpochMs(hallLastMoved == 0L ? null : hallLastMoved);
+
                 if (hallWorld != null && s.contains("hall.centerX") && s.contains("hall.centerZ")) {
                     guild.setHall(
                             hallWorld,
@@ -271,12 +283,20 @@ public final class Storage {
             guildsYaml.set(base + ".warSessionId", g.getWarSessionId() == null ? 0L : g.getWarSessionId());
 
             guildsYaml.set(base + ".claimedChunks", new ArrayList<>(g.getClaimedChunks()));
+
+            String claimTsBase = base + ".claimTimestamps";
+            guildsYaml.set(claimTsBase, null);
+            for (Map.Entry<String, Long> e : g.getClaimTimestamps().entrySet()) {
+                guildsYaml.set(claimTsBase + "." + e.getKey().replace(".", "%2E"), e.getValue());
+            }
+
             guildsYaml.set(base + ".unstableClaims", new ArrayList<>(g.getUnstableClaims()));
 
             guildsYaml.set(base + ".hall.world", g.getHallWorld());
             guildsYaml.set(base + ".hall.centerX", g.getHallCenterX());
             guildsYaml.set(base + ".hall.centerZ", g.getHallCenterZ());
             guildsYaml.set(base + ".hall.hasHall", g.hasHall());
+            guildsYaml.set(base + ".hall.lastMovedAtEpochMs", g.getHallLastMovedAtEpochMs() == null ? 0L : g.getHallLastMovedAtEpochMs());
             guildsYaml.set(base + ".hall.chunks", new ArrayList<>(g.getHallChunks()));
 
             guildsYaml.set(base + ".allies", new ArrayList<>(g.getAllies()));
