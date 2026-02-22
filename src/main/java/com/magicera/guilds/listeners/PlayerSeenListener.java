@@ -59,6 +59,8 @@ public final class PlayerSeenListener implements Listener {
             }, OFFLINE_MESSAGE_DELAY_TICKS);
         }
 
+        plugin.guildPower().handlePowerThresholdsForLoginPlayer(e.getPlayer());
+        
         plugin.storage().save();
     }
 
