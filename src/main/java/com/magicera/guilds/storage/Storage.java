@@ -475,4 +475,11 @@ public final class Storage {
     public void deleteGuild(String guildId) {
         guildsById.remove(guildId);
     }
+
+    public void clearAllData() {
+        guildsById.clear();
+        playersById.clear();
+        guildsYaml = new YamlConfiguration();
+        playersYaml = new YamlConfiguration();
+    }
 }
