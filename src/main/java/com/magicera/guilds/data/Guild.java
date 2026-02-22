@@ -46,6 +46,7 @@ public final class Guild {
     private Long warSessionId;
 
     private final Set<String> claimedChunks = new HashSet<>();
+    private final Map<String, Long> claimTimestamps = new HashMap<>();
     private final Set<String> unstableClaims = new HashSet<>();
 
     // Guild hall / hall territory metadata
@@ -53,6 +54,7 @@ public final class Guild {
     private Integer hallCenterX;
     private Integer hallCenterZ;
     private boolean hasHall;
+    private Long hallLastMovedAtEpochMs;
     private final Set<String> hallChunks = new HashSet<>();
 
     private final Set<String> allies = new HashSet<>();
@@ -108,6 +110,7 @@ public final class Guild {
         this.hallCenterX = null;
         this.hallCenterZ = null;
         this.hasHall = false;
+        this.hallLastMovedAtEpochMs = null;
     }
 
     public String getId() { return id; }
@@ -241,6 +244,7 @@ public final class Guild {
     // --- Territory / relations ---
 
     public Set<String> getClaimedChunks() { return claimedChunks; }
+    public Map<String, Long> getClaimTimestamps() { return claimTimestamps; }
     public Set<String> getUnstableClaims() { return unstableClaims; }
 
     public String getHallWorld() { return hallWorld; }
@@ -249,6 +253,9 @@ public final class Guild {
 
     public boolean hasHall() { return hasHall; }
     public void setHasHall(boolean hasHall) { this.hasHall = hasHall; }
+
+    public Long getHallLastMovedAtEpochMs() { return hallLastMovedAtEpochMs; }
+    public void setHallLastMovedAtEpochMs(Long hallLastMovedAtEpochMs) { this.hallLastMovedAtEpochMs = hallLastMovedAtEpochMs; }
 
     public Set<String> getHallChunks() { return hallChunks; }
 
@@ -278,6 +285,7 @@ public final class Guild {
         this.hallCenterX = null;
         this.hallCenterZ = null;
         this.hasHall = false;
+        this.hallLastMovedAtEpochMs = null;
         this.hallChunks.clear();
     }
 
@@ -290,7 +298,25 @@ public final class Guild {
     }
 
     public void claimChunk(String world, int x, int z) {
-        claimedChunks.add(chunkKey(world, x, z));
+        claimChunk(chunkKey(world, x, z));
+    }
+
+    public void claimChunk(String key) {
+        if (claimedChunks.add(key)) {
+            claimTimestamps.putIfAbsent(key, System.currentTimeMillis());
+        }
+    }
+
+    public boolean unclaimChunk(String key) {
+        claimTimestamps.remove(key);
+        unstableClaims.remove(key);
+        return claimedChunks.remove(key);
+    }
+
+    public void clearAllClaims() {
+        claimedChunks.clear();
+        claimTimestamps.clear();
+        unstableClaims.clear();
     }
 
     public void addLogEntry(String entry) {
