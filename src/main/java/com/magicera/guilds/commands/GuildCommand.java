@@ -2008,7 +2008,7 @@ public final class GuildCommand implements TabExecutor {
         viewer.sendMessage("§7Next tax: §f" + new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm").format(new java.util.Date(plugin.nextGuildTaxEpochMs())));
         viewer.sendMessage("§7Allies: §f" + formatGuildList(g.getAllies()));
         viewer.sendMessage("§7Enemies: §f" + formatGuildList(g.getEnemies()));
-        viewer.sendMessage("§7Claims: §f" + claimsUsed + "§7/§f" + maxClaims + " §8(supported: §f" + supportedClaims + "§8)");
+        viewer.sendMessage("§7Claims: §f" + claimsUsed + "§7/§f" + maxClaims + " §8(stable claims: §e" + supportedClaims + "§8)");
         viewer.sendMessage("§7Hall Status: §f" + hallStatus);
         viewer.sendMessage("§7Guild Power: §f" + fmt(power) + "§7/§f" + maxPower);
         viewer.sendMessage("§8§m--------------------------------");
