@@ -309,13 +309,24 @@ public final class GuildCommand implements TabExecutor {
             }
 
             if (owner != null) {
-                boolean atWar = g.getEnemies().contains(owner.getId());
-                boolean allowWarOverclaims = plugin.territoryConfig().getBoolean("unstableClaimsDuringWar", true);
-                boolean overclaimable = plugin.guildPower().canOverclaimChunk(owner, key) && (!allowWarOverclaims || atWar);
-                if (!overclaimable) {
-                    sender.sendMessage("§7[§aGuild§7] §cThat chunk is already claimed by " + owner.getName() + "§c.");
+                if (owner.getId().equals(g.getId())) {
+                    sender.sendMessage("§7[§aGuild§7] §cYour guild already controls this chunk.");
                     return true;
                 }
+
+                boolean atWar = g.getEnemies().contains(owner.getId());
+                boolean overclaimable = plugin.guildPower().canOverclaimChunk(owner, key);
+
+                if (!atWar) {
+                    sender.sendMessage("§7[§aGuild§7] §cYou can only overclaim enemy land during active war.");
+                    return true;
+                }
+
+                if (!overclaimable) {
+                    sender.sendMessage("§7[§aGuild§7] §cThis enemy chunk is not currently vulnerable to overclaim.");
+                    return true;
+                }
+
                 owner.unclaimChunk(key);
                 owner.addLogEntry("Lost claim at " + key + " to overclaim by " + g.getName());
                 plugin.guildPower().refreshUnstableClaims(owner);
@@ -1993,6 +2004,18 @@ public final class GuildCommand implements TabExecutor {
                 return true;
             }
 
+            Guild enemyForActor = enemyAlliedWith(actor, requester);
+            if (enemyForActor != null) {
+                sender.sendMessage("§7[§aGuild§7] §cYou cannot form an alliance with " + Text.color(requester.getName()) + "§c while at war. They are allied with " + Text.color(enemyForActor.getName()) + "§c.");
+                return true;
+            }
+            Guild enemyForRequester = enemyAlliedWith(requester, actor);
+            if (enemyForRequester != null) {
+                notifyGuildMaster(requester, "§7[§aGuild§7] §cYou cannot form an alliance with " + Text.color(actor.getName()) + "§c while at war. They are allied with " + Text.color(enemyForRequester.getName()) + "§c.");
+                sender.sendMessage("§7[§aGuild§7] §cAlliance acceptance blocked due to active war-side alliance restrictions.");
+                return true;
+            }
+
             requester.getPendingAllyRequests().remove(actor.getId());
             actor.getAllies().add(requester.getId());
             requester.getAllies().add(actor.getId());
@@ -2007,6 +2030,11 @@ public final class GuildCommand implements TabExecutor {
                     + " §fand "
                     + Text.color(requester.getName())
                     + " §fhave formed an alliance!");
+
+            tryJoinActiveWarOnAlliance(actor, requester);
+            tryJoinActiveWarOnAlliance(requester, actor);
+            plugin.storage().save();
+
             return true;
         }
 
@@ -2031,6 +2059,12 @@ public final class GuildCommand implements TabExecutor {
         }
         if (isOpposingSideConflict(actor, target)) {
             sender.sendMessage("§cYou cannot request an alliance with a guild on an opposing war side.");
+            return true;
+        }
+
+        Guild enemyForActor = enemyAlliedWith(actor, target);
+        if (enemyForActor != null) {
+            sender.sendMessage("§7[§aGuild§7] §cYou cannot form an alliance with " + Text.color(target.getName()) + "§c while at war. They are allied with " + Text.color(enemyForActor.getName()) + "§c.");
             return true;
         }
 
@@ -2387,6 +2421,57 @@ public final class GuildCommand implements TabExecutor {
             b.setWarEndsAtEpochMs(null);
             b.setWarSessionId(null);
             b.getWarningSentWarSession().clear();
+        }
+    }
+
+    private Guild enemyAlliedWith(Guild warGuild, Guild allianceTarget) {
+        if (warGuild == null || allianceTarget == null || !warGuild.isInWar()) return null;
+        for (String enemyId : warGuild.getEnemies()) {
+            Guild enemy = plugin.storage().getGuild(enemyId);
+            if (enemy == null) continue;
+            if (allianceTarget.getAllies().contains(enemy.getId()) || enemy.getAllies().contains(allianceTarget.getId())) {
+                return enemy;
+            }
+        }
+        return null;
+    }
+
+    private void tryJoinActiveWarOnAlliance(Guild sideMember, Guild newAlly) {
+        if (sideMember == null || newAlly == null || !sideMember.isInWar() || sideMember.getEnemies().isEmpty()) return;
+
+        Guild blockedBy = enemyAlliedWith(sideMember, newAlly);
+        if (blockedBy != null) {
+            Bukkit.broadcastMessage("§7[§aGuild§7] "
+                    + Text.color(newAlly.getName())
+                    + " §fdid not join the war because of an alliance with "
+                    + Text.color(blockedBy.getName())
+                    + "§f.");
+            return;
+        }
+
+        boolean changed = false;
+        newAlly.setInWar(true);
+        Long sideWarEnds = sideMember.getWarEndsAtEpochMs();
+        if (sideWarEnds != null) newAlly.setWarEndsAtEpochMs(sideWarEnds);
+        Long sideWarSession = sideMember.getWarSessionId();
+        if (sideWarSession != null) newAlly.setWarSessionId(sideWarSession);
+        newAlly.getWarningSentWarSession().clear();
+        newAlly.getWarningLastSent().remove("wearinessCooldown");
+        newAlly.getWarningLastSent().remove("hallCooldown");
+
+        for (String enemyId : sideMember.getEnemies()) {
+            Guild enemy = plugin.storage().getGuild(enemyId);
+            if (enemy == null || enemy.getId().equals(newAlly.getId())) continue;
+            if (newAlly.getEnemies().add(enemy.getId())) changed = true;
+            if (enemy.getEnemies().add(newAlly.getId())) changed = true;
+        }
+
+        if (changed) {
+            Bukkit.broadcastMessage("§7[§aGuild§7] "
+                    + Text.color(newAlly.getName())
+                    + " §fhas joined the war on the side of "
+                    + Text.color(sideMember.getName())
+                    + "§f!");
         }
     }
 
