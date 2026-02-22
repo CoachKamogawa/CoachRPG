@@ -387,7 +387,7 @@ public final class GuildPowerService {
             if (online != null) online.sendMessage(Text.color(personalMessage));
         }
         plugin.storage().deleteGuild(guildId);
-        Bukkit.broadcastMessage(Text.color("&7[&aGuild&7] &c" + guild.getName() + " &fhas been disbanded."));
+        Bukkit.broadcastMessage(Text.color("&7[&bMagic Era&7] &c" + guild.getName() + " &fhas been disbanded."));
     }
 
     public record AllowedClaimsBreakdown(
