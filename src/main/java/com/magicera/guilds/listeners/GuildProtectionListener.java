@@ -50,7 +50,7 @@ public final class GuildProtectionListener implements Listener {
     public void onBreak(BlockBreakEvent event) {
         if (!canBuild(event.getPlayer(), event.getBlock())) {
             event.setCancelled(true);
-            event.getPlayer().sendMessage("§cThis land is claimed.");
+            event.getPlayer().sendMessage("§7[§aGuild§7] §cThis land is claimed.");
         }
     }
 
@@ -58,7 +58,7 @@ public final class GuildProtectionListener implements Listener {
     public void onPlace(BlockPlaceEvent event) {
         if (!canBuild(event.getPlayer(), event.getBlock())) {
             event.setCancelled(true);
-            event.getPlayer().sendMessage("§cThis land is claimed.");
+            event.getPlayer().sendMessage("§7[§aGuild§7] §cThis land is claimed.");
         }
     }
 
@@ -84,14 +84,14 @@ public final class GuildProtectionListener implements Listener {
         if (isContainer(block)) {
             if (!sameGuild) {
                 event.setCancelled(true);
-                player.sendMessage("§cYou cannot access containers in this claim.");
+                player.sendMessage("§7[§aGuild§7] §cYou cannot access containers in this claim.");
             }
             return;
         }
 
         if (!sameGuild && !enemyAtWar && !canBuild(player, block)) {
             event.setCancelled(true);
-            player.sendMessage("§cThis land is claimed.");
+            player.sendMessage("§7[§aGuild§7] §cThis land is claimed.");
         }
     }
 
