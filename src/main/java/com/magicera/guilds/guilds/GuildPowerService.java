@@ -43,6 +43,7 @@ public final class GuildPowerService {
     public int allowedChunksForMembers(int memberCount) {
         var sec = plugin.territoryConfig().getConfigurationSection("territoryScaling");
         if (sec == null || sec.getKeys(false).isEmpty()) return 15;
+
         TreeMap<Integer, Integer> table = new TreeMap<>();
         for (String k : sec.getKeys(false)) {
             try {
@@ -50,11 +51,14 @@ public final class GuildPowerService {
             } catch (NumberFormatException ignored) {}
         }
         if (table.isEmpty()) return 15;
+
         int minKey = table.firstKey();
         int maxKey = table.lastKey();
         int effective = Math.max(3, memberCount);
+
         if (effective <= minKey) return table.get(minKey);
         if (effective >= maxKey) return table.get(maxKey);
+
         Map.Entry<Integer, Integer> floor = table.floorEntry(effective);
         return floor == null ? table.get(minKey) : floor.getValue();
     }
@@ -93,13 +97,25 @@ public final class GuildPowerService {
         if (excess <= 0) return;
 
         List<String> candidates = new ArrayList<>(guild.getClaimedChunks());
+
+        // claim timestamp sorting (oldest becomes unstable first) with hall-distance preference if hall exists
+        Map<String, Long> ts = guild.getClaimTimestamps();
+        if (ts == null) ts = Collections.emptyMap();
+
         String hallWorld = guild.getHallWorld();
         Integer cx = guild.getHallCenterX();
         Integer cz = guild.getHallCenterZ();
 
-        // Only prefer "farther from hall becomes unstable first" if the guild actually has a hall.
         if (guild.hasHall() && hallWorld != null && cx != null && cz != null) {
-            candidates.sort(Comparator.comparingDouble((String key) -> -distanceSqFromHall(key, hallWorld, cx, cz)));
+            Map<String, Long> finalTs = ts;
+            candidates.sort(
+                    Comparator
+                            .comparingDouble((String key) -> -distanceSqFromHall(key, hallWorld, cx, cz))
+                            .thenComparingLong(key -> finalTs.getOrDefault(key, 0L))
+            );
+        } else {
+            Map<String, Long> finalTs = ts;
+            candidates.sort(Comparator.comparingLong(key -> finalTs.getOrDefault(key, 0L)));
         }
 
         for (String key : candidates) {
@@ -114,8 +130,8 @@ public final class GuildPowerService {
         try {
             int x = Integer.parseInt(p[1]);
             int z = Integer.parseInt(p[2]);
-            long dx = x - cx;
-            long dz = z - cz;
+            long dx = (long) x - cx;
+            long dz = (long) z - cz;
             return (dx * dx) + (dz * dz);
         } catch (NumberFormatException e) {
             return Double.MAX_VALUE;
