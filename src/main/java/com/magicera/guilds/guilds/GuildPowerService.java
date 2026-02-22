@@ -67,19 +67,24 @@ public final class GuildPowerService {
 
     public AllowedClaimsBreakdown getAllowedClaimsBreakdown(Guild guild) {
         int memberCount = guild.getMembers().size();
+
+        // Size cap (what you are allowed to OWN)
         int maxClaims = Math.max(9, allowedChunksForMembers(memberCount));
+
         double currentGuildPower = guildPower(guild);
 
-        double landCostPerChunk = plugin.territoryConfig().getDouble("landCostPerChunk", 2.0);
-        int supportedClaims;
-        if (landCostPerChunk <= 0.0) {
-            supportedClaims = maxClaims;
-        } else {
-            int powerCap = (int) Math.floor(currentGuildPower / landCostPerChunk);
-            supportedClaims = Math.max(9, Math.min(maxClaims, powerCap));
-        }
+        // Support cap (what your current power can SUPPORT) – percentage-based
+        int maxPower = Math.max(1, maxGuildPower(guild));
+        double ratio = Math.max(0.0D, Math.min(1.0D, currentGuildPower / (double) maxPower));
 
-        String formulaBranch = supportedClaims < maxClaims ? "POWER_UNDER_SUPPORTED" : "FULLY_SUPPORTED";
+        int supportedClaims = (int) Math.floor(maxClaims * ratio);
+        supportedClaims = Math.max(9, supportedClaims);
+        supportedClaims = Math.min(maxClaims, supportedClaims);
+
+        String formulaBranch = (supportedClaims < maxClaims)
+                ? "POWER_UNDER_SUPPORTED"
+                : "FULLY_SUPPORTED";
+
         return new AllowedClaimsBreakdown(memberCount, maxClaims, currentGuildPower, supportedClaims, formulaBranch);
     }
 
@@ -138,7 +143,6 @@ public final class GuildPowerService {
         }
         if (candidates.isEmpty()) return;
 
-        // claim timestamp sorting (oldest becomes unstable first) with hall-distance preference if hall exists
         Map<String, Long> ts = guild.getClaimTimestamps();
         if (ts == null) ts = Collections.emptyMap();
 
@@ -232,7 +236,6 @@ public final class GuildPowerService {
             return;
         }
 
-        // Only disband for 0 land if they had actually established a hall (i.e., they progressed into territory gameplay).
         if (claims <= 0) {
             if (guild.hasHall()) {
                 disbandGuild(guild, "&7[&aGuild&7] &cYour guild has lost all territory and has been disbanded.");
@@ -254,57 +257,40 @@ public final class GuildPowerService {
         int atRisk = hallAtRiskThreshold(guild);
         int vulnerable = hallVulnerableThreshold(guild);
 
-        // Hall: only send the current most severe tier.
         String hallTier = currentHallTier(power, atRisk, vulnerable);
 
-        // Weariness: only send the current most severe tier.
         String wearinessTier = currentWearinessTier(power, max);
         if ("collapse10".equals(wearinessTier)) {
             maybeWarnChannel(
-                    guild,
-                    "weariness",
-                    "collapse10",
+                    guild, "weariness", "collapse10",
                     "&7[&aGuild&7] &cYour guild is below &e10% &cpower. You are on the verge of collapse. If power reaches &e0&c, the guild will disband.",
-                    now,
-                    loginTarget
+                    now, loginTarget
             );
         } else if ("critical25".equals(wearinessTier)) {
             maybeWarnChannel(
-                    guild,
-                    "weariness",
-                    "critical25",
+                    guild, "weariness", "critical25",
                     "&7[&aGuild&7] &cYour guild is below &e25% &cpower. Continued losses will begin threatening your territory.",
-                    now,
-                    loginTarget
+                    now, loginTarget
             );
         } else if ("warWeariness50".equals(wearinessTier)) {
             maybeWarnChannel(
-                    guild,
-                    "weariness",
-                    "warWeariness50",
+                    guild, "weariness", "warWeariness50",
                     "&7[&aGuild&7] &cYour guild has fallen below &e50% &cpower, and casualties are increasing. Consider seeking a truce.",
-                    now,
-                    loginTarget
+                    now, loginTarget
             );
         }
 
         if ("hallVulnerable".equals(hallTier)) {
             maybeWarnChannel(
-                    guild,
-                    "hall",
-                    "hallVulnerable",
+                    guild, "hall", "hallVulnerable",
                     "&7[&aGuild&7] &cYour guild is at threat of collapse. The Guild Hall is no longer secure and can now be overclaimed.",
-                    now,
-                    loginTarget
+                    now, loginTarget
             );
         } else if ("hallAtRisk".equals(hallTier)) {
             maybeWarnChannel(
-                    guild,
-                    "hall",
-                    "hallAtRisk",
+                    guild, "hall", "hallAtRisk",
                     "&7[&aGuild&7] &cYour Guild Hall is at risk. You are close to losing protection.",
-                    now,
-                    loginTarget
+                    now, loginTarget
             );
         }
     }
@@ -340,11 +326,9 @@ public final class GuildPowerService {
         long lastTierCode = guild.getWarningLastSent().getOrDefault(tierKey, Long.MIN_VALUE);
 
         if (lastTierCode != currentTierCode) {
-            if (loginTarget != null) {
-                loginTarget.sendMessage(Text.color(message));
-            } else {
-                sendGuildMessage(guild, message);
-            }
+            if (loginTarget != null) loginTarget.sendMessage(Text.color(message));
+            else sendGuildMessage(guild, message);
+
             guild.getWarningLastSent().put(channelKey, now);
             guild.getWarningLastSent().put(tierKey, currentTierCode);
             return;
@@ -353,11 +337,9 @@ public final class GuildPowerService {
         long last = guild.getWarningLastSent().getOrDefault(channelKey, 0L);
         if ((now - last) < cooldownMs) return;
 
-        if (loginTarget != null) {
-            loginTarget.sendMessage(Text.color(message));
-        } else {
-            sendGuildMessage(guild, message);
-        }
+        if (loginTarget != null) loginTarget.sendMessage(Text.color(message));
+        else sendGuildMessage(guild, message);
+
         guild.getWarningLastSent().put(channelKey, now);
         guild.getWarningLastSent().put(tierKey, currentTierCode);
     }
