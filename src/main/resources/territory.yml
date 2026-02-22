@@ -2,6 +2,10 @@ maxGuildMembers: 45
 playerPowerMax: 10.0
 playerPowerRegenPerHour: 3.33
 landCostPerChunk: 2.0
+moveHallCooldownHours: 24
+allowCrossWorldHallMove: false
+hallRequiredAfterHours: 48
+unstableClaimsDuringWar: true
 territoryScaling:
   3: 15
   4: 17
@@ -14,9 +18,7 @@ territoryScaling:
   11: 27
   12: 28
   13: 29
-  14: 29
   15: 30
-  16: 31
   20: 33
   25: 35
   30: 37
