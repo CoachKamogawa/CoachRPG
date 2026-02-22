@@ -53,4 +53,8 @@ public final class InviteManager {
     public void clearInvite(Player invitedPlayer) {
         if (invitedPlayer != null) invites.remove(invitedPlayer.getUniqueId());
     }
+
+    public void clearAll() {
+        invites.clear();
+    }
 }
