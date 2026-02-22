@@ -314,8 +314,11 @@ public final class GuildCommand implements TabExecutor {
                     return true;
                 }
 
-                boolean atWar = g.getEnemies().contains(owner.getId());
-                boolean overclaimable = plugin.guildPower().canOverclaimChunk(owner, key);
+                boolean atWar = g.getEnemies().contains(owner.getId())
+                        && owner.getEnemies().contains(g.getId())
+                        && g.isInWar()
+                        && owner.isInWar();
+                boolean overclaimable = plugin.guildPower().canOverclaimChunk(g, owner, key);
 
                 if (!atWar) {
                     sender.sendMessage("§7[§aGuild§7] §cYou can only overclaim enemy land during active war.");
@@ -327,6 +330,10 @@ public final class GuildCommand implements TabExecutor {
                     return true;
                 }
 
+                plugin.getLogger().fine("[OVERCLAIM] TRANSFER chunk=" + key
+                        + " oldOwner=" + owner.getId()
+                        + " newOwner=" + g.getId()
+                        + " reason=war_vulnerable");
                 owner.unclaimChunk(key);
                 owner.addLogEntry("Lost claim at " + key + " to overclaim by " + g.getName());
                 plugin.guildPower().refreshUnstableClaims(owner);
@@ -376,6 +383,9 @@ public final class GuildCommand implements TabExecutor {
                     }
                 }
                 int removed = g.getClaimedChunks().size();
+                for (String removedKey : new HashSet<>(g.getClaimedChunks())) {
+                    plugin.getLogger().fine("[CLAIM-REMOVE] chunk=" + removedKey + " guild=" + g.getId() + " reason=manual_unclaim_all");
+                }
                 g.clearAllClaims();
                 g.clearHall();
                 g.addLogEntry("Unclaimed all land by " + player.getName());
@@ -391,6 +401,7 @@ public final class GuildCommand implements TabExecutor {
                 sender.sendMessage("§7[§aGuild§7] §cYou cannot unclaim overclaimed territory during an active war.");
                 return true;
             }
+            plugin.getLogger().fine("[CLAIM-REMOVE] chunk=" + key + " guild=" + g.getId() + " reason=manual_unclaim_single");
             if (!g.unclaimChunk(key)) {
                 sender.sendMessage("§cThis chunk is not claimed by your guild.");
                 return true;
