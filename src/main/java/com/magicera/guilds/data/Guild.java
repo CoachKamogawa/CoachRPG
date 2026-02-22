@@ -52,6 +52,7 @@ public final class Guild {
     private String hallWorld;
     private Integer hallCenterX;
     private Integer hallCenterZ;
+    private boolean hasHall;
     private final Set<String> hallChunks = new HashSet<>();
 
     private final Set<String> allies = new HashSet<>();
@@ -106,6 +107,7 @@ public final class Guild {
         this.hallWorld = null;
         this.hallCenterX = null;
         this.hallCenterZ = null;
+        this.hasHall = false;
     }
 
     public String getId() { return id; }
@@ -244,6 +246,10 @@ public final class Guild {
     public String getHallWorld() { return hallWorld; }
     public Integer getHallCenterX() { return hallCenterX; }
     public Integer getHallCenterZ() { return hallCenterZ; }
+
+    public boolean hasHall() { return hasHall; }
+    public void setHasHall(boolean hasHall) { this.hasHall = hasHall; }
+
     public Set<String> getHallChunks() { return hallChunks; }
 
     public Set<String> getAllies() { return allies; }
@@ -262,6 +268,7 @@ public final class Guild {
         this.hallWorld = world;
         this.hallCenterX = centerX;
         this.hallCenterZ = centerZ;
+        this.hasHall = true;
         this.hallChunks.clear();
         if (chunks != null) this.hallChunks.addAll(chunks);
     }
@@ -270,6 +277,7 @@ public final class Guild {
         this.hallWorld = null;
         this.hallCenterX = null;
         this.hallCenterZ = null;
+        this.hasHall = false;
         this.hallChunks.clear();
     }
 
