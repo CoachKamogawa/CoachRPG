@@ -193,42 +193,46 @@ public final class GuildPowerService {
 
         if (!guild.isInWar()) return;
 
-        // Weariness: only send the *current* tier (not multiple tiers).
-        String wearinessTier = currentWearinessTier(power, max);
-        if ("collapse10".equals(wearinessTier)) {
-            maybeWarnChannel(
-                    guild,
-                    "weariness",
-                    "collapse10",
-                    "&7[&aGuild&7] &cYour guild is below &e10% &cpower. You are on the verge of collapse. If power reaches &e0&c, the guild will disband.",
-                    now,
-                    loginTarget
-            );
-        } else if ("critical25".equals(wearinessTier)) {
-            maybeWarnChannel(
-                    guild,
-                    "weariness",
-                    "critical25",
-                    "&7[&aGuild&7] &cYour guild is below &e25% &cpower. Continued losses will begin threatening your territory.",
-                    now,
-                    loginTarget
-            );
-        } else if ("warWeariness50".equals(wearinessTier)) {
-            maybeWarnChannel(
-                    guild,
-                    "weariness",
-                    "warWeariness50",
-                    "&7[&aGuild&7] &cYour guild has fallen below &e50% &cpower, and casualties are increasing. Consider seeking a truce.",
-                    now,
-                    loginTarget
-            );
-        }
-
         int atRisk = hallAtRiskThreshold(guild);
         int vulnerable = hallVulnerableThreshold(guild);
 
         // Hall: only send the *current* tier (not both).
         String hallTier = currentHallTier(power, atRisk, vulnerable);
+
+        // Weariness: only send the *current* tier (not multiple tiers).
+        // Once the hall becomes vulnerable and overclaimable, suppress general weariness warnings.
+        if (!"hallVulnerable".equals(hallTier)) {
+            String wearinessTier = currentWearinessTier(power, max);
+            if ("collapse10".equals(wearinessTier)) {
+                maybeWarnChannel(
+                        guild,
+                        "weariness",
+                        "collapse10",
+                        "&7[&aGuild&7] &cYour guild is below &e10% &cpower. You are on the verge of collapse. If power reaches &e0&c, the guild will disband.",
+                        now,
+                        loginTarget
+                );
+            } else if ("critical25".equals(wearinessTier)) {
+                maybeWarnChannel(
+                        guild,
+                        "weariness",
+                        "critical25",
+                        "&7[&aGuild&7] &cYour guild is below &e25% &cpower. Continued losses will begin threatening your territory.",
+                        now,
+                        loginTarget
+                );
+            } else if ("warWeariness50".equals(wearinessTier)) {
+                maybeWarnChannel(
+                        guild,
+                        "weariness",
+                        "warWeariness50",
+                        "&7[&aGuild&7] &cYour guild has fallen below &e50% &cpower, and casualties are increasing. Consider seeking a truce.",
+                        now,
+                        loginTarget
+                );
+            }
+        }
+
         if ("hallVulnerable".equals(hallTier)) {
             maybeWarnChannel(
                     guild,
