@@ -160,10 +160,19 @@ public final class GuildPowerService {
         }
         return owner.getUnstableClaims().contains(key);
     }
-@@ -286,70 +287,83 @@
+
+    /**
+     * Channel-tier warning with:
+     * - global cooldown per-channel
+     * - per-member cooldown for login delivery
+     * - "once per war session" suppression per (channel,tier)
+     */
+    public void maybeWarnChannelTier(Guild guild, String channel, String tier, boolean condition, String message, long now, Player loginTarget) {
+        if (!condition) return;
         if (!plugin.territoryConfig().getBoolean("warningTiers." + tier, true)) return;
 
         long cooldownMs = Math.max(1, plugin.territoryConfig().getLong("warningCooldownMinutes", 15)) * 60_000L;
+
         String warTierKey = "war:" + channel + ":" + tier;
         boolean tierAlreadySentThisWar = guild.getWarningSentWarSession().contains(warTierKey);
 
