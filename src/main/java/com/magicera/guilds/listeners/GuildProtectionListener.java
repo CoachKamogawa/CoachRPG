@@ -4,6 +4,7 @@ import com.magicera.guilds.MagicEraGuildsPlugin;
 import com.magicera.guilds.data.Guild;
 import com.magicera.guilds.data.PlayerData;
 import com.nisovin.magicspells.events.SpellTargetEvent;
+import net.kyori.adventure.text.Component;
 import org.bukkit.Material;
 import org.bukkit.block.Block;
 import org.bukkit.entity.Entity;
@@ -14,6 +15,7 @@ import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.block.BlockBreakEvent;
 import org.bukkit.event.block.BlockPlaceEvent;
+import org.bukkit.event.EventHandler;
 import org.bukkit.event.entity.EntityCombustByEntityEvent;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
@@ -134,7 +136,7 @@ public final class GuildProtectionListener implements Listener {
             if (!prev.isEmpty()) {
                 Guild previousOwner = plugin.storage().getGuild(prev);
                 if (previousOwner != null) {
-                    player.sendTitle("§fLeaving the territory of " + previousOwner.getName(), "", 5, 40, 10);
+                    player.sendActionBar(Component.text("Leaving " + previousOwner.getName() + " territory."));
                 }
             }
             return;
