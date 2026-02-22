@@ -115,6 +115,31 @@ public final class Storage {
                 }
 
                 guild.getUnstableClaims().addAll(s.getStringList("unstableClaims"));
+                guild.getOverclaimedChunks().addAll(s.getStringList("overclaimedChunks"));
+
+                ConfigurationSection overclaimWarSessionIds = s.getConfigurationSection("overclaimWarSessionIds");
+                if (overclaimWarSessionIds != null) {
+                    for (String key : overclaimWarSessionIds.getKeys(false)) {
+                        String decoded = key.replace("%2E", ".");
+                        guild.getOverclaimWarSessionIds().put(decoded, overclaimWarSessionIds.getLong(key, 0L));
+                    }
+                }
+
+                ConfigurationSection overclaimTimes = s.getConfigurationSection("overclaimTimes");
+                if (overclaimTimes != null) {
+                    for (String key : overclaimTimes.getKeys(false)) {
+                        String decoded = key.replace("%2E", ".");
+                        guild.getOverclaimTimes().put(decoded, overclaimTimes.getLong(key, 0L));
+                    }
+                }
+
+                ConfigurationSection overclaimedFromGuildIds = s.getConfigurationSection("overclaimedFromGuildIds");
+                if (overclaimedFromGuildIds != null) {
+                    for (String key : overclaimedFromGuildIds.getKeys(false)) {
+                        String decoded = key.replace("%2E", ".");
+                        guild.getOverclaimedFromGuildIds().put(decoded, overclaimedFromGuildIds.getString(key, ""));
+                    }
+                }
 
                 String hallWorld = s.getString("hall.world");
                 guild.setHasHall(s.getBoolean("hall.hasHall", false));
@@ -291,6 +316,25 @@ public final class Storage {
             }
 
             guildsYaml.set(base + ".unstableClaims", new ArrayList<>(g.getUnstableClaims()));
+            guildsYaml.set(base + ".overclaimedChunks", new ArrayList<>(g.getOverclaimedChunks()));
+
+            String overclaimWarSessionIdsBase = base + ".overclaimWarSessionIds";
+            guildsYaml.set(overclaimWarSessionIdsBase, null);
+            for (Map.Entry<String, Long> e : g.getOverclaimWarSessionIds().entrySet()) {
+                guildsYaml.set(overclaimWarSessionIdsBase + "." + e.getKey().replace(".", "%2E"), e.getValue());
+            }
+
+            String overclaimTimesBase = base + ".overclaimTimes";
+            guildsYaml.set(overclaimTimesBase, null);
+            for (Map.Entry<String, Long> e : g.getOverclaimTimes().entrySet()) {
+                guildsYaml.set(overclaimTimesBase + "." + e.getKey().replace(".", "%2E"), e.getValue());
+            }
+
+            String overclaimedFromGuildIdsBase = base + ".overclaimedFromGuildIds";
+            guildsYaml.set(overclaimedFromGuildIdsBase, null);
+            for (Map.Entry<String, String> e : g.getOverclaimedFromGuildIds().entrySet()) {
+                guildsYaml.set(overclaimedFromGuildIdsBase + "." + e.getKey().replace(".", "%2E"), e.getValue());
+            }
 
             guildsYaml.set(base + ".hall.world", g.getHallWorld());
             guildsYaml.set(base + ".hall.centerX", g.getHallCenterX());
