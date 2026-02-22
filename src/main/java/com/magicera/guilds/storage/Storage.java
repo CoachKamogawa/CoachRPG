@@ -108,6 +108,7 @@ public final class Storage {
                 guild.getUnstableClaims().addAll(s.getStringList("unstableClaims"));
 
                 String hallWorld = s.getString("hall.world");
+                guild.setHasHall(s.getBoolean("hall.hasHall", false));
                 if (hallWorld != null && s.contains("hall.centerX") && s.contains("hall.centerZ")) {
                     guild.setHall(
                             hallWorld,
@@ -275,6 +276,7 @@ public final class Storage {
             guildsYaml.set(base + ".hall.world", g.getHallWorld());
             guildsYaml.set(base + ".hall.centerX", g.getHallCenterX());
             guildsYaml.set(base + ".hall.centerZ", g.getHallCenterZ());
+            guildsYaml.set(base + ".hall.hasHall", g.hasHall());
             guildsYaml.set(base + ".hall.chunks", new ArrayList<>(g.getHallChunks()));
 
             guildsYaml.set(base + ".allies", new ArrayList<>(g.getAllies()));
