@@ -98,7 +98,13 @@ public final class GuildPowerService {
         guild.getUnstableClaims().clear();
         if (excess <= 0) return;
 
-        List<String> candidates = new ArrayList<>(guild.getClaimedChunks());
+        List<String> candidates = new ArrayList<>();
+        for (String key : guild.getClaimedChunks()) {
+            if (!guild.isHallChunk(key)) {
+                candidates.add(key);
+            }
+        }
+        if (candidates.isEmpty()) return;
 
         // claim timestamp sorting (oldest becomes unstable first) with hall-distance preference if hall exists
         Map<String, Long> ts = guild.getClaimTimestamps();
@@ -144,7 +150,7 @@ public final class GuildPowerService {
         refreshUnstableClaims(owner);
 
         // Hall chunks follow hall vulnerability directly.
-        if (owner.hasHall() && owner.getHallChunks().contains(key)) {
+        if (owner.isHallChunk(key)) {
             return !isHallProtected(owner);
         }
         return owner.getUnstableClaims().contains(key);
