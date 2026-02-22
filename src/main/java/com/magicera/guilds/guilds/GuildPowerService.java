@@ -78,7 +78,7 @@ public final class GuildPowerService {
         double ratio = Math.max(0.0D, Math.min(1.0D, currentGuildPower / (double) maxPower));
 
         int supportedClaims = (int) Math.floor(maxClaims * ratio);
-        supportedClaims = Math.max(9, supportedClaims);
+        supportedClaims = Math.max(0, supportedClaims);
         supportedClaims = Math.min(maxClaims, supportedClaims);
 
         String formulaBranch = (supportedClaims < maxClaims)
