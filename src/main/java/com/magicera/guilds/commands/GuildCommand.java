@@ -2237,6 +2237,10 @@ public final class GuildCommand implements TabExecutor {
         target.setWarSessionId(warSessionId);
         actor.getWarningSentWarSession().clear();
         target.getWarningSentWarSession().clear();
+        actor.getWarningLastSent().remove("wearinessCooldown");
+        actor.getWarningLastSent().remove("hallCooldown");
+        target.getWarningLastSent().remove("wearinessCooldown");
+        target.getWarningLastSent().remove("hallCooldown");
 
         long warEnd = System.currentTimeMillis() + (24L * 60L * 60L * 1000L);
         actor.setWarEndsAtEpochMs(warEnd);
@@ -2246,10 +2250,6 @@ public final class GuildCommand implements TabExecutor {
         Set<String> sideB = new HashSet<>();
         sideA.add(actor.getId());
         sideB.add(target.getId());
-
-        // server announcement for both anchor guilds entering war
-        announceWarEntry(actor, actor);
-        announceWarEntry(target, target);
 
         callAlliesToWar(actor, target, actor, warEnd, warSessionId, sideA, sideB);
         callAlliesToWar(target, actor, actor, warEnd, warSessionId, sideB, sideA);
@@ -2284,7 +2284,7 @@ public final class GuildCommand implements TabExecutor {
                 notifyGuild(participant,
                         "§7[§aGuild§7] "
                                 + Text.color(ally.getName())
-                                + " §fwas not called to war due to an existing treaty with "
+                                + " §fdid not join the war because of an alliance with "
                                 + Text.color(opposingAnchor.getName())
                                 + "§f.");
                 continue;
@@ -2295,6 +2295,8 @@ public final class GuildCommand implements TabExecutor {
             ally.setWarEndsAtEpochMs(warEnd);
             ally.setWarSessionId(warSessionId);
             ally.getWarningSentWarSession().clear();
+            ally.getWarningLastSent().remove("wearinessCooldown");
+            ally.getWarningLastSent().remove("hallCooldown");
 
             for (String enemyId : opposingSide) {
                 Guild enemy = plugin.storage().getGuild(enemyId);
@@ -2304,7 +2306,7 @@ public final class GuildCommand implements TabExecutor {
             }
 
             if (newJoin) {
-                announceWarEntry(ally, participant);
+                announceAllyWarEntry(ally, participant);
             }
         }
     }
@@ -2319,7 +2321,7 @@ public final class GuildCommand implements TabExecutor {
         return false;
     }
 
-    private void announceWarEntry(Guild entrant, Guild sideLeader) {
+    private void announceAllyWarEntry(Guild entrant, Guild sideLeader) {
         Bukkit.broadcastMessage("§7[§aGuild§7] "
                 + Text.color(entrant.getName())
                 + " §fhas joined the war on the side of "
