@@ -182,7 +182,7 @@ public final class GuildCommand implements TabExecutor {
                 return true;
             }
 
-            int allowed = plugin.guildPower().allowedChunks(g);
+            int allowed = plugin.guildPower().getAllowedClaims(g);
             Set<String> merged = new HashSet<>(g.getClaimedChunks());
             merged.addAll(hall);
             if (merged.size() > allowed) {
@@ -251,7 +251,7 @@ public final class GuildCommand implements TabExecutor {
                 return true;
             }
 
-            int allowed = plugin.guildPower().allowedChunks(g);
+            int allowed = plugin.guildPower().getAllowedClaims(g);
             Set<String> projected = new HashSet<>(g.getClaimedChunks());
             projected.removeAll(oldHall);
             projected.addAll(newHall);
@@ -450,7 +450,7 @@ public final class GuildCommand implements TabExecutor {
                     return true;
                 }
                 sender.sendMessage("§7Your Power: §f" + fmt(pd.getPower()));
-                sender.sendMessage("§7Guild Power: §f" + fmt(guildPower(g)));
+                sender.sendMessage("§7Guild Power: §f" + fmt(plugin.guildPower().guildPower(g)));
                 return true;
             }
 
@@ -1164,6 +1164,7 @@ public final class GuildCommand implements TabExecutor {
             pd.setOutOfAlignmentSinceEpochMs(null);
             guild.setRole(player.getUniqueId(), GuildRole.MEMBER);
             guild.addLogEntry("Member joined: " + player.getName());
+            plugin.guildPower().handlePowerThresholds(guild);
 
             plugin.inviteManager().clearInvite(player);
             plugin.storage().save();
@@ -1211,6 +1212,7 @@ public final class GuildCommand implements TabExecutor {
             pd.setGuildTitle("");
             pd.setOutOfAlignmentSinceEpochMs(null);
             guild.addLogEntry("Member left: " + player.getName());
+            plugin.guildPower().handlePowerThresholds(guild);
             plugin.storage().save();
 
             sender.sendMessage("§aYou left the guild.");
@@ -1264,6 +1266,7 @@ public final class GuildCommand implements TabExecutor {
                     targetPd.setOutOfAlignmentSinceEpochMs(null);
                 }
                 guild.addLogEntry("Admin kick: " + safeName(targetId));
+                plugin.guildPower().handlePowerThresholds(guild);
                 plugin.storage().save();
                 sender.sendMessage("§aRemoved §f" + safeName(targetId) + " §afrom guild §r" + Text.color(guild.getName()) + "§a.");
                 return true;
@@ -1318,6 +1321,7 @@ public final class GuildCommand implements TabExecutor {
                 targetPd.setOutOfAlignmentSinceEpochMs(null);
             }
             guild.addLogEntry("Kick: " + safeName(targetId) + " by " + player.getName());
+            plugin.guildPower().handlePowerThresholds(guild);
             plugin.storage().save();
 
             String targetName = Bukkit.getOfflinePlayer(targetId).getName();
@@ -1608,6 +1612,7 @@ public final class GuildCommand implements TabExecutor {
                     targetPd.setOutOfAlignmentSinceEpochMs(null);
                 }
                 guild.addLogEntry("Admin kick: " + safeName(targetId));
+                plugin.guildPower().handlePowerThresholds(guild);
                 plugin.storage().save();
                 sender.sendMessage("§aRemoved §f" + safeName(targetId) + " §afrom guild §r" + Text.color(guild.getName()) + "§a.");
             }
@@ -1912,7 +1917,7 @@ public final class GuildCommand implements TabExecutor {
     }
 
     private int maxClaims(Guild guild) {
-        return plugin.guildPower().allowedChunks(guild);
+        return plugin.guildPower().getAllowedClaims(guild);
     }
 
     private Set<String> hallArea(String world, int centerX, int centerZ) {
@@ -1973,7 +1978,15 @@ public final class GuildCommand implements TabExecutor {
         double power = plugin.guildPower().guildPower(g);
         int maxPower = plugin.guildPower().maxGuildPower(g);
         int claimsUsed = g.getClaimedChunks().size();
-        int claimsAllowed = plugin.guildPower().allowedChunks(g);
+        var allowedClaims = plugin.guildPower().getAllowedClaimsBreakdown(g);
+        int claimsAllowed = allowedClaims.computedAllowedClaims();
+
+        plugin.getLogger().info("[GUILD-INFO DEBUG] guild=" + g.getId()
+                + " memberCount=" + allowedClaims.memberCount()
+                + " scalingTableCap=" + allowedClaims.scalingTableCap()
+                + " currentGuildPower=" + fmt(allowedClaims.currentGuildPower())
+                + " computedAllowedClaims=" + allowedClaims.computedAllowedClaims()
+                + " formulaBranch=" + allowedClaims.formulaBranch());
 
         String hallStatus = "None";
         if (g.hasHall()) {
@@ -2323,6 +2336,8 @@ public final class GuildCommand implements TabExecutor {
         callAlliesToWar(target, actor, actor, warEnd, warSessionId, sideB, sideA);
 
         notifyGuildMaster(target, "§7[§bMagic Era§7] §cYour guild is now at war with " + Text.color(actor.getName()) + "§c.");
+        plugin.guildPower().handlePowerThresholds(actor);
+        plugin.guildPower().handlePowerThresholds(target);
 
         Bukkit.broadcastMessage("§7[§bMagic Era§7] "
                 + Text.color(actor.getName())
@@ -2373,6 +2388,7 @@ public final class GuildCommand implements TabExecutor {
                 enemy.getEnemies().add(ally.getId());
             }
 
+            plugin.guildPower().handlePowerThresholds(ally);
             if (newJoin) {
                 announceAllyWarEntry(ally, participant);
             }
@@ -2459,6 +2475,8 @@ public final class GuildCommand implements TabExecutor {
             b.setWarSessionId(null);
             b.getWarningSentWarSession().clear();
         }
+        plugin.guildPower().handlePowerThresholds(a);
+        plugin.guildPower().handlePowerThresholds(b);
     }
 
     private Guild enemyAlliedWith(Guild warGuild, Guild allianceTarget) {
@@ -2551,14 +2569,6 @@ public final class GuildCommand implements TabExecutor {
         if (minutes <= 0L) return seconds + "s";
         if (seconds == 0L) return minutes + "m";
         return minutes + "m " + seconds + "s";
-    }
-
-    private double guildPower(Guild g) {
-        double power = 0.0;
-        for (UUID id : g.getMembers().keySet()) {
-            power += plugin.storage().getOrCreatePlayer(id).getPower();
-        }
-        return power;
     }
 
     private static final class ParsedCreate {
