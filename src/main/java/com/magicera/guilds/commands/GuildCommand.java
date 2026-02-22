@@ -163,44 +163,112 @@ public final class GuildCommand implements TabExecutor {
                 sender.sendMessage("§cOnly the guild master can claim the Guild Hall.");
                 return true;
             }
-            if (!g.getHallChunks().isEmpty()) {
-                sender.sendMessage("§cYour guild already has a Guild Hall.");
+            if (g.hasHall()) {
+                sender.sendMessage("§cYour guild already has a Guild Hall. Use /guild movehall.");
+                return true;
+            }
+            if (g.isInWar()) {
+                sender.sendMessage("§7[§aGuild§7] §cYou cannot claim a Guild Hall during war.");
                 return true;
             }
 
             String world = player.getWorld().getName();
             int cx = player.getChunk().getX();
             int cz = player.getChunk().getZ();
+            Set<String> hall = hallArea(world, cx, cz);
 
-            List<String> hall = new ArrayList<>();
-            for (int x = cx - 1; x <= cx + 1; x++) {
-                for (int z = cz - 1; z <= cz + 1; z++) {
-                    String key = Guild.chunkKey(world, x, z);
-
-                    for (Guild other : plugin.storage().allGuilds()) {
-                        if (!other.getId().equals(g.getId()) && other.getClaimedChunks().contains(key)) {
-                            sender.sendMessage("§cGuild Hall claim failed because part of the 3x3 is already claimed.");
-                            return true;
-                        }
-                    }
-                    hall.add(key);
-                }
+            if (!isHallAreaAvailable(g, hall, Collections.emptySet())) {
+                sender.sendMessage("§7[§aGuild§7] §cGuild Hall claim failed because part of the 3x3 is already claimed.");
+                return true;
             }
 
             int allowed = plugin.guildPower().allowedChunks(g);
             Set<String> merged = new HashSet<>(g.getClaimedChunks());
             merged.addAll(hall);
             if (merged.size() > allowed) {
-                sender.sendMessage("§cGuild claim cap reached (§f" + allowed + "§c). Reduce land before claiming hall.");
+                sender.sendMessage("§7[§aGuild§7] §cGuild claim cap reached §f" + allowed + "§c. Reduce land before claiming hall.");
                 return true;
             }
 
-            g.getClaimedChunks().addAll(hall);
+            for (String key : hall) g.claimChunk(key);
             g.setHall(world, cx, cz, hall);
+            g.setHallLastMovedAtEpochMs(System.currentTimeMillis());
             g.addLogEntry("Guild Hall claimed at " + world + ":" + cx + ":" + cz + " by " + player.getName());
             plugin.guildPower().refreshUnstableClaims(g);
             plugin.storage().save();
-            sender.sendMessage("§aGuild Hall claimed as a 3x3 territory.");
+            sender.sendMessage("§7[§aGuild§7] §aGuild Hall claimed as a 3x3 territory.");
+            return true;
+        }
+
+        if (sub.equals("movehall")) {
+            if (!(sender instanceof Player player)) {
+                sender.sendMessage("§cPlayers only.");
+                return true;
+            }
+            PlayerData pd = plugin.storage().getOrCreatePlayer(player.getUniqueId());
+            if (pd.getGuildId() == null) {
+                sender.sendMessage("§cYou are not in a guild.");
+                return true;
+            }
+            Guild g = plugin.storage().getGuild(pd.getGuildId());
+            if (g == null) return true;
+            if (g.getMembers().get(player.getUniqueId()) != GuildRole.MASTER) {
+                sender.sendMessage("§cOnly the guild master can move the Guild Hall.");
+                return true;
+            }
+            if (!g.hasHall()) {
+                sender.sendMessage("§7[§aGuild§7] §cYour guild does not have a Guild Hall. Use /guild claimhall first.");
+                return true;
+            }
+            if (g.isInWar()) {
+                sender.sendMessage("§7[§aGuild§7] §cYou cannot move your Guild Hall during war.");
+                return true;
+            }
+
+            String world = player.getWorld().getName();
+            if (!plugin.territoryConfig().getBoolean("allowCrossWorldHallMove", false)
+                    && g.getHallWorld() != null
+                    && !g.getHallWorld().equals(world)) {
+                sender.sendMessage("§7[§aGuild§7] §cYou can only move your Guild Hall inside its current world.");
+                return true;
+            }
+
+            long cooldownMs = Math.max(1, plugin.territoryConfig().getLong("moveHallCooldownHours", 24L)) * 60L * 60L * 1000L;
+            Long lastMoved = g.getHallLastMovedAtEpochMs();
+            if (lastMoved != null && (System.currentTimeMillis() - lastMoved) < cooldownMs) {
+                sender.sendMessage("§7[§aGuild§7] §cGuild Hall move is on cooldown for §e"
+                        + formatDuration(cooldownMs - (System.currentTimeMillis() - lastMoved)) + "§c.");
+                return true;
+            }
+
+            int cx = player.getChunk().getX();
+            int cz = player.getChunk().getZ();
+            Set<String> newHall = hallArea(world, cx, cz);
+            Set<String> oldHall = new HashSet<>(g.getHallChunks());
+
+            if (!isHallAreaAvailable(g, newHall, oldHall)) {
+                sender.sendMessage("§7[§aGuild§7] §cGuild Hall move failed because part of the 3x3 is already claimed.");
+                return true;
+            }
+
+            int allowed = plugin.guildPower().allowedChunks(g);
+            Set<String> projected = new HashSet<>(g.getClaimedChunks());
+            projected.removeAll(oldHall);
+            projected.addAll(newHall);
+            if (projected.size() > allowed) {
+                sender.sendMessage("§7[§aGuild§7] §cGuild claim cap reached §f" + allowed + "§c. Reduce land before moving hall.");
+                return true;
+            }
+
+            for (String chunk : oldHall) g.unclaimChunk(chunk);
+            for (String chunk : newHall) g.claimChunk(chunk);
+
+            g.setHall(world, cx, cz, newHall);
+            g.setHallLastMovedAtEpochMs(System.currentTimeMillis());
+            g.addLogEntry("Guild Hall moved to " + world + ":" + cx + ":" + cz + " by " + player.getName());
+            plugin.guildPower().refreshUnstableClaims(g);
+            plugin.storage().save();
+            sender.sendMessage("§7[§aGuild§7] §aGuild Hall moved to the new 3x3 territory.");
             return true;
         }
 
@@ -225,7 +293,7 @@ public final class GuildCommand implements TabExecutor {
                 sender.sendMessage("§cYou need at least 10 power to claim a chunk.");
                 return true;
             }
-            if (g.getHallChunks().isEmpty()) {
+            if (!g.hasHall()) {
                 sender.sendMessage("§cYour guild must claim a Guild Hall first using /guild claimhall.");
                 return true;
             }
@@ -247,7 +315,7 @@ public final class GuildCommand implements TabExecutor {
                     sender.sendMessage("§cThat chunk is already claimed by " + owner.getName());
                     return true;
                 }
-                owner.getClaimedChunks().remove(key);
+                owner.unclaimChunk(key);
                 if (owner.getHallChunks().contains(key)) owner.clearHall();
                 owner.addLogEntry("Lost claim at " + key + " to overclaim by " + g.getName());
                 plugin.guildPower().refreshUnstableClaims(owner);
@@ -260,7 +328,7 @@ public final class GuildCommand implements TabExecutor {
                 return true;
             }
 
-            g.getClaimedChunks().add(key);
+            g.claimChunk(key);
             plugin.guildPower().refreshUnstableClaims(g);
             g.addLogEntry("Claimed land at " + key + " by " + player.getName());
             plugin.guildPower().handlePowerThresholds(g);
@@ -286,7 +354,7 @@ public final class GuildCommand implements TabExecutor {
 
             if (args.length >= 2 && args[1].equalsIgnoreCase("all")) {
                 int removed = g.getClaimedChunks().size();
-                g.getClaimedChunks().clear();
+                g.clearAllClaims();
                 g.clearHall();
                 g.addLogEntry("Unclaimed all land by " + player.getName());
                 plugin.guildPower().refreshUnstableClaims(g);
@@ -297,7 +365,7 @@ public final class GuildCommand implements TabExecutor {
             }
 
             String key = Guild.chunkKey(player.getWorld().getName(), player.getChunk().getX(), player.getChunk().getZ());
-            if (!g.getClaimedChunks().remove(key)) {
+            if (!g.unclaimChunk(key)) {
                 sender.sendMessage("§cThis chunk is not claimed by your guild.");
                 return true;
             }
@@ -1562,6 +1630,7 @@ public final class GuildCommand implements TabExecutor {
                 }
             }
 
+            cleanupGuildBeforeDisband(g);
             plugin.storage().deleteGuild(g.getId());
             plugin.storage().save();
 
@@ -1585,7 +1654,7 @@ public final class GuildCommand implements TabExecutor {
         // /guild <sub>
         if (args.length == 1) {
             List<String> subs = new ArrayList<>(List.of(
-                    "help", "menu", "chat", "home", "sethome", "claimland", "claimhall", "claimtoggle", "unclaim", "ally", "unally", "war", "truce",
+                    "help", "menu", "chat", "home", "sethome", "claimland", "claimhall", "movehall", "claimtoggle", "unclaim", "ally", "unally", "war", "truce",
                     "create", "invite", "accept", "leave", "kick", "promote", "newmaster", "title", "deny", "disband", "impeach",
                     "bank", "deposit", "withdraw", "tax", "desc", "rename", "info", "power", "friendlyfire", "allyfire", "?", "1", "2"
             ));
@@ -1744,6 +1813,7 @@ public final class GuildCommand implements TabExecutor {
             sender.sendMessage("§7/guild withdraw <amount>");
             sender.sendMessage("§7/guild claimland");
             sender.sendMessage("§7/guild claimhall");
+            sender.sendMessage("§7/guild movehall");
             sender.sendMessage("§7/guild unclaim §8(or /guild unclaim all)");
             sender.sendMessage("§7/guild power");
             sender.sendMessage("§7/guild friendlyfire <on|off>");
@@ -1800,6 +1870,44 @@ public final class GuildCommand implements TabExecutor {
         return plugin.guildPower().allowedChunks(guild);
     }
 
+    private Set<String> hallArea(String world, int centerX, int centerZ) {
+        Set<String> hall = new HashSet<>();
+        for (int x = centerX - 1; x <= centerX + 1; x++) {
+            for (int z = centerZ - 1; z <= centerZ + 1; z++) {
+                hall.add(Guild.chunkKey(world, x, z));
+            }
+        }
+        return hall;
+    }
+
+    private boolean isHallAreaAvailable(Guild actor, Set<String> targetHall, Set<String> oldHall) {
+        for (String key : targetHall) {
+            for (Guild other : plugin.storage().allGuilds()) {
+                if (other.getId().equals(actor.getId())) continue;
+                if (oldHall.contains(key)) continue;
+                if (other.getClaimedChunks().contains(key)) return false;
+            }
+        }
+        return true;
+    }
+
+    private void cleanupGuildBeforeDisband(Guild guild) {
+        guild.clearHall();
+        guild.clearAllClaims();
+        guild.getWarningLastSent().clear();
+        guild.getWarningSentWarSession().clear();
+
+        String guildId = guild.getId();
+        for (Guild other : plugin.storage().allGuilds()) {
+            if (other.getId().equals(guildId)) continue;
+            other.getAllies().remove(guildId);
+            other.getEnemies().remove(guildId);
+            other.getPendingAllyRequests().remove(guildId);
+            other.getPendingWarRequests().remove(guildId);
+            other.getPendingTruceRequests().remove(guildId);
+        }
+    }
+
     private void sendGuildInfo(Player viewer, Guild g) {
         viewer.sendMessage("§8§m--------------------------------");
         viewer.sendMessage("§7[§aGuild Info§7] §r" + Text.color(g.getName()));
@@ -1817,14 +1925,28 @@ public final class GuildCommand implements TabExecutor {
             viewer.sendMessage("§7" + r.name() + ": §f" + String.join(", ", names));
         }
 
-        double power = 0.0;
-        for (UUID id : g.getMembers().keySet()) power += plugin.storage().getOrCreatePlayer(id).getPower();
+        double power = plugin.guildPower().guildPower(g);
+        int maxPower = plugin.guildPower().maxGuildPower(g);
+        int claimsUsed = g.getClaimedChunks().size();
+        int claimsAllowed = plugin.guildPower().allowedChunks(g);
+
+        String hallStatus = "None";
+        if (g.hasHall()) {
+            int atRisk = plugin.guildPower().hallAtRiskThreshold(g);
+            int vulnerable = plugin.guildPower().hallVulnerableThreshold(g);
+            if (power <= vulnerable) hallStatus = "Vulnerable";
+            else if (power <= atRisk) hallStatus = "At Risk";
+            else hallStatus = "Protected";
+        }
+
         viewer.sendMessage("§7Bank: §f$" + fmt(g.getBankBalance()));
         viewer.sendMessage("§7Tax: §f" + g.getTaxPercent() + "%");
         viewer.sendMessage("§7Next tax: §f" + new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm").format(new java.util.Date(plugin.nextGuildTaxEpochMs())));
         viewer.sendMessage("§7Allies: §f" + formatGuildList(g.getAllies()));
         viewer.sendMessage("§7Enemies: §f" + formatGuildList(g.getEnemies()));
-        viewer.sendMessage("§7Total Power: §f" + fmt(power));
+        viewer.sendMessage("§7Claims: §f" + claimsUsed + "§7/§f" + claimsAllowed);
+        viewer.sendMessage("§7Hall Status: §f" + hallStatus);
+        viewer.sendMessage("§7Guild Power: §f" + fmt(power) + "§7/§f" + maxPower);
         viewer.sendMessage("§8§m--------------------------------");
     }
 
@@ -1850,6 +1972,10 @@ public final class GuildCommand implements TabExecutor {
             sender.sendMessage("§cOnly the guild master can use this command.");
             return true;
         }
+        if (!actor.hasHall()) {
+            sender.sendMessage("§7[§aGuild§7] §cYour guild must claim a Guild Hall before forming alliances.");
+            return true;
+        }
 
         if (args.length >= 3 && args[1].equalsIgnoreCase("accept")) {
             Guild requester = resolveGuildTarget(args[2]);
@@ -1859,6 +1985,10 @@ public final class GuildCommand implements TabExecutor {
             }
             if (!actor.getPendingAllyRequests().remove(requester.getId())) {
                 sender.sendMessage("§cNo pending ally request from that guild.");
+                return true;
+            }
+            if (!requester.hasHall()) {
+                sender.sendMessage("§7[§aGuild§7] §cThat guild must claim a Guild Hall before forming alliances.");
                 return true;
             }
             if (isOpposingSideConflict(actor, requester)) {
@@ -1891,6 +2021,10 @@ public final class GuildCommand implements TabExecutor {
         Guild target = resolveGuildTarget(args[1]);
         if (target == null || target.getId().equals(actor.getId())) {
             sender.sendMessage("§cInvalid target guild.");
+            return true;
+        }
+        if (!target.hasHall()) {
+            sender.sendMessage("§7[§aGuild§7] §cThat guild must claim a Guild Hall before forming alliances.");
             return true;
         }
 
@@ -1939,6 +2073,10 @@ public final class GuildCommand implements TabExecutor {
             sender.sendMessage("§cOnly the guild master can use this command.");
             return true;
         }
+        if (!actor.hasHall()) {
+            sender.sendMessage("§7[§aGuild§7] §cYour guild must claim a Guild Hall before starting war.");
+            return true;
+        }
 
         if (args.length >= 3 && args[1].equalsIgnoreCase("accept")) {
             Guild requester = resolveGuildTarget(args[2]);
@@ -1946,10 +2084,24 @@ public final class GuildCommand implements TabExecutor {
                 sender.sendMessage("§cInvalid target guild.");
                 return true;
             }
-            if (!actor.getPendingWarRequests().remove(requester.getId())) {
+            if (!actor.getPendingWarRequests().contains(requester.getId())) {
                 sender.sendMessage("§cNo pending war request from that guild.");
                 return true;
             }
+            if (!requester.hasHall()) {
+                sender.sendMessage("§7[§aGuild§7] §cWar cannot begin. The attacking guild has no Guild Hall.");
+                return true;
+            }
+            if (requester.getClaimedChunks().isEmpty()) {
+                sender.sendMessage("§7[§aGuild§7] §cWar cannot begin. The attacking guild has no claimed land.");
+                return true;
+            }
+            if (actor.getClaimedChunks().isEmpty()) {
+                sender.sendMessage("§7[§aGuild§7] §cWar cannot begin. Your guild has no claimed land.");
+                return true;
+            }
+
+            actor.getPendingWarRequests().remove(requester.getId());
             declareWar(requester, actor);
             plugin.storage().save();
             return true;
@@ -1968,6 +2120,18 @@ public final class GuildCommand implements TabExecutor {
 
         if (actor.getEnemies().contains(target.getId())) {
             sender.sendMessage("§cYour guild is already at war with that guild.");
+            return true;
+        }
+        if (!target.hasHall()) {
+            sender.sendMessage("§7[§aGuild§7] §cWar cannot begin. Target guild has no Guild Hall.");
+            return true;
+        }
+        if (actor.getClaimedChunks().isEmpty()) {
+            sender.sendMessage("§7[§aGuild§7] §cWar cannot begin. Your guild has no claimed land.");
+            return true;
+        }
+        if (target.getClaimedChunks().isEmpty()) {
+            sender.sendMessage("§7[§aGuild§7] §cWar cannot begin. Target guild has no claimed land.");
             return true;
         }
 
