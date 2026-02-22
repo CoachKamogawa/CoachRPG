@@ -69,6 +69,16 @@ public final class GuildPowerService {
         return allowedChunksForMembers(guild.getMembers().size());
     }
 
+    public int allowedChunksByPower(Guild guild) {
+        double landCostPerChunk = plugin.territoryConfig().getDouble("landCostPerChunk", 2.0);
+        if (landCostPerChunk <= 0.0) return Integer.MAX_VALUE;
+        return Math.max(0, (int) Math.floor(guildPower(guild) / landCostPerChunk));
+    }
+
+    public int maxClaimableChunks(Guild guild) {
+        return Math.min(allowedChunks(guild), allowedChunksByPower(guild));
+    }
+
     public int hallVulnerableThreshold(Guild guild) {
         int fixedCount = plugin.territoryConfig().getInt("fixedThresholdMemberCount", 15);
         double pct = plugin.territoryConfig().getDouble("hallVulnerablePercentUnderOrEqual15", 0.15);
@@ -94,7 +104,7 @@ public final class GuildPowerService {
     }
 
     public void refreshUnstableClaims(Guild guild) {
-        int excess = Math.max(0, guild.getClaimedChunks().size() - allowedChunks(guild));
+        int excess = Math.max(0, guild.getClaimedChunks().size() - maxClaimableChunks(guild));
         guild.getUnstableClaims().clear();
         if (excess <= 0) return;
 
