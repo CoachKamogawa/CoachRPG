@@ -97,7 +97,8 @@ public final class GuildPowerService {
         Integer cx = guild.getHallCenterX();
         Integer cz = guild.getHallCenterZ();
 
-        if (hallWorld != null && cx != null && cz != null) {
+        // Only prefer "farther from hall becomes unstable first" if the guild actually has a hall.
+        if (guild.hasHall() && hallWorld != null && cx != null && cz != null) {
             candidates.sort(Comparator.comparingDouble((String key) -> -distanceSqFromHall(key, hallWorld, cx, cz)));
         }
 
@@ -123,7 +124,9 @@ public final class GuildPowerService {
 
     public boolean canOverclaimChunk(Guild owner, String key) {
         refreshUnstableClaims(owner);
-        if (owner.getHallChunks().contains(key) && isHallProtected(owner)) {
+
+        // Hall chunk protection should only apply if the guild actually has a hall.
+        if (owner.hasHall() && owner.getHallChunks().contains(key) && isHallProtected(owner)) {
             return false;
         }
         return owner.getUnstableClaims().contains(key);
@@ -140,8 +143,12 @@ public final class GuildPowerService {
             disbandGuild(guild, "&7[&aGuild&7] &cYour guild has collapsed at &e0 &cpower and has been disbanded.");
             return;
         }
+
+        // Only disband for 0 land if they had actually established a hall (i.e., they progressed into territory gameplay).
         if (claims <= 0) {
-            disbandGuild(guild, "&7[&aGuild&7] &cYour guild has lost all territory and has been disbanded.");
+            if (guild.hasHall()) {
+                disbandGuild(guild, "&7[&aGuild&7] &cYour guild has lost all territory and has been disbanded.");
+            }
             return;
         }
 
@@ -164,7 +171,6 @@ public final class GuildPowerService {
                 "&7[&aGuild&7] &cYour Guild Hall is at risk. You are close to losing protection. Do not make unnecessary risks.", now);
         maybeWarn(guild, "hallVulnerable", power <= vulnerable,
                 "&7[&aGuild&7] &cYour guild is at threat of collapse. The Guild Hall is no longer secure and can now be overclaimed.", now);
-
     }
 
     private void maybeWarn(Guild guild, String tier, boolean condition, String message, long now) {
