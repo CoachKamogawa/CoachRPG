@@ -161,18 +161,132 @@ public final class GuildPowerService {
         return owner.getUnstableClaims().contains(key);
     }
 
-    /**
-     * Channel-tier warning with:
-     * - global cooldown per-channel
-     * - per-member cooldown for login delivery
-     * - "once per war session" suppression per (channel,tier)
-     */
-    public void maybeWarnChannelTier(Guild guild, String channel, String tier, boolean condition, String message, long now, Player loginTarget) {
-        if (!condition) return;
+    public void handlePowerThresholds(Guild guild) {
+        evaluatePowerThresholds(guild, System.currentTimeMillis(), null);
+    }
+
+    public void handlePowerThresholdsForLoginPlayer(Player player) {
+        if (player == null) return;
+
+        PlayerData pd = plugin.storage().getOrCreatePlayer(player.getUniqueId());
+        String guildId = pd.getGuildId();
+        if (guildId == null || guildId.isBlank()) return;
+
+        Guild guild = plugin.storage().getGuild(guildId);
+        if (guild == null || !guild.isInWar()) return;
+
+        evaluatePowerThresholds(guild, System.currentTimeMillis(), player);
+    }
+
+    private void evaluatePowerThresholds(Guild guild, long now, Player loginTarget) {
+        refreshUnstableClaims(guild);
+
+        int claims = guild.getClaimedChunks().size();
+        double power = guildPower(guild);
+        int max = Math.max(1, maxGuildPower(guild));
+
+        if (power <= 0.0) {
+            disbandGuild(guild, "&7[&aGuild&7] &cYour guild has collapsed at &e0 &cpower and has been disbanded.");
+            return;
+        }
+
+        // Only disband for 0 land if they had actually established a hall (i.e., they progressed into territory gameplay).
+        if (claims <= 0) {
+            if (guild.hasHall()) {
+                disbandGuild(guild, "&7[&aGuild&7] &cYour guild has lost all territory and has been disbanded.");
+            }
+            return;
+        }
+
+        int lowClaimsThreshold = plugin.territoryConfig().getInt("lowClaimsThreshold", 3);
+        maybeWarn(guild, "lowClaims", claims <= lowClaimsThreshold,
+                "&7[&aGuild&7] &cYour guild controls only &e" + claims + " &cremaining claims. Losing all territory will result in disband.", now);
+
+        if (!guild.isInWar()) return;
+
+        int atRisk = hallAtRiskThreshold(guild);
+        int vulnerable = hallVulnerableThreshold(guild);
+
+        // Hall: only send the *current* tier (not both).
+        String hallTier = currentHallTier(power, atRisk, vulnerable);
+
+        // Weariness: only send the *current* tier (not multiple tiers).
+        // Once the hall becomes vulnerable and overclaimable, suppress general weariness warnings.
+        if (!"hallVulnerable".equals(hallTier)) {
+            String wearinessTier = currentWearinessTier(power, max);
+            if ("collapse10".equals(wearinessTier)) {
+                maybeWarnChannel(
+                        guild,
+                        "weariness",
+                        "collapse10",
+                        "&7[&aGuild&7] &cYour guild is below &e10% &cpower. You are on the verge of collapse. If power reaches &e0&c, the guild will disband.",
+                        now,
+                        loginTarget
+                );
+            } else if ("critical25".equals(wearinessTier)) {
+                maybeWarnChannel(
+                        guild,
+                        "weariness",
+                        "critical25",
+                        "&7[&aGuild&7] &cYour guild is below &e25% &cpower. Continued losses will begin threatening your territory.",
+                        now,
+                        loginTarget
+                );
+            } else if ("warWeariness50".equals(wearinessTier)) {
+                maybeWarnChannel(
+                        guild,
+                        "weariness",
+                        "warWeariness50",
+                        "&7[&aGuild&7] &cYour guild has fallen below &e50% &cpower, and casualties are increasing. Consider seeking a truce.",
+                        now,
+                        loginTarget
+                );
+            }
+        }
+
+        if ("hallVulnerable".equals(hallTier)) {
+            maybeWarnChannel(
+                    guild,
+                    "hall",
+                    "hallVulnerable",
+                    "&7[&aGuild&7] &cYour guild is at threat of collapse. The Guild Hall is no longer secure and can now be overclaimed.",
+                    now,
+                    loginTarget
+            );
+        } else if ("hallAtRisk".equals(hallTier)) {
+            maybeWarnChannel(
+                    guild,
+                    "hall",
+                    "hallAtRisk",
+                    "&7[&aGuild&7] &cYour Guild Hall is at risk. You are close to losing protection.",
+                    now,
+                    loginTarget
+            );
+        }
+    }
+
+    private String currentWearinessTier(double power, int maxPower) {
+        if (power <= maxPower * 0.10D) return "collapse10";
+        if (power <= maxPower * 0.25D) return "critical25";
+        if (power <= maxPower * 0.50D) return "warWeariness50";
+        return null;
+    }
+
+    private String currentHallTier(double power, int atRiskThreshold, int vulnerableThreshold) {
+        if (power <= vulnerableThreshold) return "hallVulnerable";
+        if (power <= atRiskThreshold) return "hallAtRisk";
+        return null;
+    }
+
+    private void maybeWarnChannel(Guild guild,
+                                 String channel,
+                                 String tier,
+                                 String message,
+                                 long now,
+                                 Player loginTarget) {
         if (!plugin.territoryConfig().getBoolean("warningTiers." + tier, true)) return;
 
         long cooldownMs = Math.max(1, plugin.territoryConfig().getLong("warningCooldownMinutes", 15)) * 60_000L;
-
         String warTierKey = "war:" + channel + ":" + tier;
         boolean tierAlreadySentThisWar = guild.getWarningSentWarSession().contains(warTierKey);
 
