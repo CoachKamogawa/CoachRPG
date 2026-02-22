@@ -135,28 +135,59 @@ public final class MagicEraGuildsPlugin extends JavaPlugin {
     public List<String> resetAndReloadPluginConfigs() {
         List<String> deletedFiles = new ArrayList<>();
 
-        // stop any running tasks first
         Bukkit.getScheduler().cancelTasks(this);
+        autoSaveTask = null;
+        guildTaxTask = null;
+        alignmentWarningTask = null;
+        guildMaintenanceTask = null;
 
-        File dataFolder = getDataFolder();
-        File[] configFiles = new File[] {
-                new File(dataFolder, "config.yml"),
-                new File(dataFolder, "territory.yml")
-        };
+        if (inviteManager != null) inviteManager.clearAll();
 
-        for (File configFile : configFiles) {
-            if (configFile.exists() && configFile.delete()) {
-                deletedFiles.add(configFile.getName());
+        if (!getDataFolder().exists()) {
+            //noinspection ResultOfMethodCallIgnored
+            getDataFolder().mkdirs();
+        }
+
+        File[] files = getDataFolder().listFiles();
+        if (files != null) {
+            for (File file : files) {
+                deleteRecursively(file, deletedFiles);
             }
         }
 
         reloadPluginConfigs();
 
-        if (guildPower != null) guildPower.clampAllPowers();
-        if (storage != null) storage.save();
+        if (storage != null) {
+            storage.clearAllData();
+            storage.save();
+        }
 
         startRecurringTasks();
         return deletedFiles;
+    }
+
+    private void deleteRecursively(File file, List<String> deletedFiles) {
+        if (file == null || !file.exists()) return;
+
+        if (file.isDirectory()) {
+            File[] children = file.listFiles();
+            if (children != null) {
+                for (File child : children) {
+                    deleteRecursively(child, deletedFiles);
+                }
+            }
+        }
+
+        try {
+            String relative = getDataFolder().toPath().relativize(file.toPath()).toString().replace('\\', '/');
+            if (file.delete()) {
+                deletedFiles.add(relative.isBlank() ? file.getName() : relative);
+            } else {
+                getLogger().warning("Failed to delete plugin data path during thanossnap: " + file.getAbsolutePath());
+            }
+        } catch (Exception ex) {
+            getLogger().warning("Error deleting plugin data path during thanossnap: " + file.getAbsolutePath() + " (" + ex.getMessage() + ")");
+        }
     }
 
     private void startRecurringTasks() {
