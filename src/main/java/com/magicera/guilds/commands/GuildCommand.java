@@ -1868,7 +1868,7 @@ public final class GuildCommand implements TabExecutor {
     }
 
     private int maxClaims(Guild guild) {
-        return plugin.guildPower().maxClaimableChunks(guild);
+        return plugin.guildPower().allowedChunks(guild);
     }
 
     private Set<String> hallArea(String world, int centerX, int centerZ) {
