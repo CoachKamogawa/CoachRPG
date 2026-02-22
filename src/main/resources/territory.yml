@@ -36,4 +36,4 @@ warningTiers:
   hallVulnerable: true
   lowClaims: true
 lowClaimsThreshold: 3
-warningCooldownMinutes: 10
+warningCooldownMinutes: 15
