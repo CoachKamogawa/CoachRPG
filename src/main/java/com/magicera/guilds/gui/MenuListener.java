@@ -41,7 +41,7 @@ public final class MenuListener implements Listener {
             if (raw == 11) {
                 PlayerData pd = plugin.storage().getOrCreatePlayer(player.getUniqueId());
                 if (pd.getGuildId() == null) {
-                    player.sendMessage("§cYou are not in a guild.");
+                    player.sendMessage("§7[§aGuild§7] §cYou are not in a guild.");
                     return;
                 }
                 Guild g = plugin.storage().getGuild(pd.getGuildId());
