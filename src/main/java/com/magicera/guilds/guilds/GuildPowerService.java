@@ -258,7 +258,7 @@ public final class GuildPowerService {
                     guild,
                     "weariness",
                     "warWeariness50",
-                    "&7[&aGuild&7] &cYour guild has fallen below &e50% &cpower. Casualties are increasing and regeneration remains disabled during war. Consider seeking a truce.",
+                    "&7[&aGuild&7] &cYour guild has fallen below &e50% &cpower, and casualties are increasing. Consider seeking a truce.",
                     now,
                     loginTarget
             );
@@ -278,7 +278,7 @@ public final class GuildPowerService {
                     guild,
                     "hall",
                     "hallAtRisk",
-                    "&7[&aGuild&7] &cYour Guild Hall is at risk. You are close to losing protection. Do not make unnecessary risks.",
+                    "&7[&aGuild&7] &cYour Guild Hall is at risk. You are close to losing protection.",
                     now,
                     loginTarget
             );
