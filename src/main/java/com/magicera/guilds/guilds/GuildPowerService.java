@@ -67,7 +67,11 @@ public final class GuildPowerService {
 
     public int allowedChunks(Guild guild) {
         int scalingCap = Math.max(9, allowedChunksForMembers(guild.getMembers().size()));
-        int effectiveByPower = Math.max(9, (int) Math.floor(guildPower(guild) / 2.0));
+
+        int baselineClaims = 15;
+        int powerExpansionClaims = (int) Math.floor(guildPower(guild) / 2.0);
+        int effectiveByPower = Math.max(9, baselineClaims + powerExpansionClaims - 5);
+
         return Math.max(9, Math.min(scalingCap, effectiveByPower));
     }
 
