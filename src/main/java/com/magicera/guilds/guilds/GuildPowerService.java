@@ -77,23 +77,58 @@ public final class GuildPowerService {
         int maxPower = Math.max(1, maxGuildPower(guild));
         double ratio = Math.max(0.0D, Math.min(1.0D, currentGuildPower / (double) maxPower));
 
-        int supportedClaims = (int) Math.floor(maxClaims * ratio);
-        supportedClaims = Math.max(0, supportedClaims);
-        supportedClaims = Math.min(maxClaims, supportedClaims);
+        int supportedClaimsRaw = (int) Math.floor(maxClaims * ratio);
+        supportedClaimsRaw = Math.max(0, supportedClaimsRaw);
+        supportedClaimsRaw = Math.min(maxClaims, supportedClaimsRaw);
 
-        String formulaBranch = (supportedClaims < maxClaims)
-                ? "POWER_UNDER_SUPPORTED"
-                : "FULLY_SUPPORTED";
+        // "How many claims could you support at the moment your hall becomes vulnerable?"
+        int vulnerablePower = hallVulnerableThreshold(guild);
+        double vulnerableRatio = Math.max(0.0D, Math.min(1.0D, vulnerablePower / (double) maxPower));
+        int supportedAtHallVulnerable = (int) Math.floor(maxClaims * vulnerableRatio);
+        supportedAtHallVulnerable = Math.max(0, Math.min(maxClaims, supportedAtHallVulnerable));
 
-        return new AllowedClaimsBreakdown(memberCount, maxClaims, currentGuildPower, supportedClaims, formulaBranch);
+        boolean hallProtected = !guild.hasHall() || currentGuildPower > vulnerablePower;
+
+        // Effective supported claims: show 0 if the hall is vulnerable.
+        int supportedClaimsEffective = hallProtected ? supportedClaimsRaw : 0;
+
+        String formulaBranch;
+        if (!hallProtected && guild.hasHall()) {
+            formulaBranch = "HALL_VULNERABLE_ZERO_SUPPORT";
+        } else if (supportedClaimsEffective < maxClaims) {
+            formulaBranch = "POWER_UNDER_SUPPORTED";
+        } else {
+            formulaBranch = "FULLY_SUPPORTED";
+        }
+
+        return new AllowedClaimsBreakdown(
+                memberCount,
+                maxClaims,
+                currentGuildPower,
+                supportedClaimsEffective,
+                supportedClaimsRaw,
+                supportedAtHallVulnerable,
+                formulaBranch
+        );
     }
 
     public int getMaxClaims(Guild guild) {
         return getAllowedClaimsBreakdown(guild).maxClaims();
     }
 
+    /** Effective supported claims (0 when hall is vulnerable). */
     public int getSupportedClaims(Guild guild) {
         return getAllowedClaimsBreakdown(guild).supportedClaims();
+    }
+
+    /** Raw power-based supported claims (ignores hall vulnerability). */
+    public int getSupportedClaimsRaw(Guild guild) {
+        return getAllowedClaimsBreakdown(guild).supportedClaimsRaw();
+    }
+
+    /** Claims supported at the hall-vulnerable threshold. */
+    public int getSupportedClaimsAtHallVulnerable(Guild guild) {
+        return getAllowedClaimsBreakdown(guild).supportedAtHallVulnerable();
     }
 
     @Deprecated
@@ -197,18 +232,15 @@ public final class GuildPowerService {
 
         if (!atWar) return false;
 
-        // Hall is special: only vulnerable when protection is lost.
         if (owner.isHallChunk(key)) {
             return !isHallProtected(owner);
         }
 
-        // Non-hall: if owner is over-supported (claims > supported), any non-hall chunk is vulnerable.
         int supported = getSupportedClaims(owner);
         if (owner.getClaimedChunks().size() > supported) {
             return true;
         }
 
-        // Fallback to specific unstable selection (should be redundant when over-supported is true).
         refreshUnstableClaims(owner);
         return owner.getUnstableClaims().contains(key);
     }
@@ -401,6 +433,8 @@ public final class GuildPowerService {
             int maxClaims,
             double currentGuildPower,
             int supportedClaims,
+            int supportedClaimsRaw,
+            int supportedAtHallVulnerable,
             String formulaBranch
     ) {}
 }
