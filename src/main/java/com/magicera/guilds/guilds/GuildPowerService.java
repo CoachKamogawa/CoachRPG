@@ -67,11 +67,7 @@ public final class GuildPowerService {
 
     public int allowedChunks(Guild guild) {
         int scalingCap = Math.max(9, allowedChunksForMembers(guild.getMembers().size()));
-
-        int baselineClaims = 15;
-        int powerExpansionClaims = (int) Math.floor(guildPower(guild) / 2.0);
-        int effectiveByPower = Math.max(9, baselineClaims + powerExpansionClaims - 5);
-
+        int effectiveByPower = Math.max(9, (int) Math.floor(guildPower(guild) / 2.0));
         return Math.max(9, Math.min(scalingCap, effectiveByPower));
     }
 
@@ -157,10 +153,20 @@ public final class GuildPowerService {
         }
     }
 
-    public boolean canOverclaimChunk(Guild owner, String key) {
+    public boolean canOverclaimChunk(Guild attacker, Guild owner, String key) {
         refreshUnstableClaims(owner);
 
-        // Hall chunks follow hall vulnerability directly.
+        boolean atWar = attacker != null
+                && owner != null
+                && attacker.getEnemies().contains(owner.getId())
+                && owner.getEnemies().contains(attacker.getId())
+                && attacker.isInWar()
+                && owner.isInWar();
+
+        if (!atWar) {
+            return false;
+        }
+
         if (owner.isHallChunk(key)) {
             return !isHallProtected(owner);
         }
