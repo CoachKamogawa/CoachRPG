@@ -179,7 +179,7 @@ public final class GuildMaintenanceTask implements Runnable {
         }
         guild.setRole(replacement, GuildRole.MASTER);
         guild.addLogEntry("Master change: " + safeName(replacement) + " | " + reason);
-        Bukkit.broadcastMessage(Text.color("&7[&aGuild&7] &f" + safeName(replacement) + " is now the guild master of " + guild.getName() + "."));
+        Bukkit.broadcastMessage(Text.color("&7[&bMagic Era&7] &f" + safeName(replacement) + " is now the guild master of " + guild.getName() + "."));
     }
 
     private UUID findMaster(Guild guild) {
