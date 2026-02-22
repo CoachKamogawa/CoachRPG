@@ -340,6 +340,11 @@ public final class GuildCommand implements TabExecutor {
             }
 
             g.claimChunk(key);
+            if (owner != null) {
+                g.markClaimAsOverclaimed(key, g.getWarSessionId(), System.currentTimeMillis(), owner.getId());
+            } else {
+                g.markClaimAsNormal(key);
+            }
             plugin.guildPower().refreshUnstableClaims(g);
             g.addLogEntry("Claimed land at " + key + " by " + player.getName());
             plugin.guildPower().handlePowerThresholds(g);
@@ -364,6 +369,12 @@ public final class GuildCommand implements TabExecutor {
             }
 
             if (args.length >= 2 && args[1].equalsIgnoreCase("all")) {
+                for (String claimKey : g.getClaimedChunks()) {
+                    if (g.isOverclaimUnclaimLocked(claimKey)) {
+                        sender.sendMessage("§7[§aGuild§7] §cYou cannot unclaim overclaimed territory during an active war.");
+                        return true;
+                    }
+                }
                 int removed = g.getClaimedChunks().size();
                 g.clearAllClaims();
                 g.clearHall();
@@ -376,6 +387,10 @@ public final class GuildCommand implements TabExecutor {
             }
 
             String key = Guild.chunkKey(player.getWorld().getName(), player.getChunk().getX(), player.getChunk().getZ());
+            if (g.isOverclaimUnclaimLocked(key)) {
+                sender.sendMessage("§7[§aGuild§7] §cYou cannot unclaim overclaimed territory during an active war.");
+                return true;
+            }
             if (!g.unclaimChunk(key)) {
                 sender.sendMessage("§cThis chunk is not claimed by your guild.");
                 return true;
@@ -597,8 +612,18 @@ public final class GuildCommand implements TabExecutor {
                 sender.sendMessage("§cNo permission.");
                 return true;
             }
-            plugin.reloadConfig();
+            plugin.reloadPluginConfigs();
             sender.sendMessage("§aConfig reloaded.");
+            return true;
+        }
+
+        if (sub.equals("thanossnap")) {
+            if (!sender.hasPermission("magicera.admin")) {
+                sender.sendMessage("§cNo permission.");
+                return true;
+            }
+            plugin.resetAndReloadPluginConfigs();
+            sender.sendMessage("§7[§aGuild§7] §cConfigs have been deleted and reloaded.");
             return true;
         }
 
@@ -1672,6 +1697,7 @@ public final class GuildCommand implements TabExecutor {
                 subs.add("adminadd");
                 subs.add("adminkick");
                 subs.add("forcetax");
+                subs.add("thanossnap");
             }
             return filterPrefix(subs, input);
         }
@@ -1841,7 +1867,7 @@ public final class GuildCommand implements TabExecutor {
             sender.sendMessage("§7/guild claimtoggle");
         }
         if (sender.hasPermission("magicera.admin")) {
-            sender.sendMessage("§7/guild reload | add | adminadd | adminkick | forcetax | power");
+            sender.sendMessage("§7/guild reload | thanossnap | add | adminadd | adminkick | forcetax | power");
         }
     }
 
