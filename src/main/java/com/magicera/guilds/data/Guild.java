@@ -49,6 +49,12 @@ public final class Guild {
     private final Map<String, Long> claimTimestamps = new HashMap<>();
     private final Set<String> unstableClaims = new HashSet<>();
 
+    // Overclaim tracking
+    private final Set<String> overclaimedChunks = new HashSet<>();
+    private final Map<String, Long> overclaimWarSessionIds = new HashMap<>();
+    private final Map<String, Long> overclaimTimes = new HashMap<>();
+    private final Map<String, String> overclaimedFromGuildIds = new HashMap<>();
+
     // Guild hall / hall territory metadata
     private String hallWorld;
     private Integer hallCenterX;
@@ -247,6 +253,11 @@ public final class Guild {
     public Map<String, Long> getClaimTimestamps() { return claimTimestamps; }
     public Set<String> getUnstableClaims() { return unstableClaims; }
 
+    public Set<String> getOverclaimedChunks() { return overclaimedChunks; }
+    public Map<String, Long> getOverclaimWarSessionIds() { return overclaimWarSessionIds; }
+    public Map<String, Long> getOverclaimTimes() { return overclaimTimes; }
+    public Map<String, String> getOverclaimedFromGuildIds() { return overclaimedFromGuildIds; }
+
     public String getHallWorld() { return hallWorld; }
     public Integer getHallCenterX() { return hallCenterX; }
     public Integer getHallCenterZ() { return hallCenterZ; }
@@ -340,13 +351,59 @@ public final class Guild {
     public boolean unclaimChunk(String key) {
         claimTimestamps.remove(key);
         unstableClaims.remove(key);
+
+        overclaimedChunks.remove(key);
+        overclaimWarSessionIds.remove(key);
+        overclaimTimes.remove(key);
+        overclaimedFromGuildIds.remove(key);
+
         return claimedChunks.remove(key);
+    }
+
+    public void markClaimAsOverclaimed(String key, Long warSessionId, long overclaimTime, String fromGuildId) {
+        if (key == null || !claimedChunks.contains(key)) return;
+
+        overclaimedChunks.add(key);
+
+        if (warSessionId != null) {
+            overclaimWarSessionIds.put(key, warSessionId);
+        } else {
+            overclaimWarSessionIds.remove(key);
+        }
+
+        overclaimTimes.put(key, Math.max(0L, overclaimTime));
+
+        if (fromGuildId != null && !fromGuildId.isBlank()) {
+            overclaimedFromGuildIds.put(key, fromGuildId);
+        } else {
+            overclaimedFromGuildIds.remove(key);
+        }
+    }
+
+    public void markClaimAsNormal(String key) {
+        overclaimedChunks.remove(key);
+        overclaimWarSessionIds.remove(key);
+        overclaimTimes.remove(key);
+        overclaimedFromGuildIds.remove(key);
+    }
+
+    public boolean isOverclaimUnclaimLocked(String key) {
+        if (!overclaimedChunks.contains(key)) return false;
+        Long claimWarSession = overclaimWarSessionIds.get(key);
+        if (claimWarSession == null) return false;
+        Long activeWarSession = getWarSessionId();
+        return isInWar() && activeWarSession != null && activeWarSession.equals(claimWarSession);
     }
 
     public void clearAllClaims() {
         claimedChunks.clear();
         claimTimestamps.clear();
         unstableClaims.clear();
+
+        overclaimedChunks.clear();
+        overclaimWarSessionIds.clear();
+        overclaimTimes.clear();
+        overclaimedFromGuildIds.clear();
     }
 
     public void addLogEntry(String entry) {
