@@ -213,7 +213,7 @@ public final class MagicEraGuildsPlugin extends JavaPlugin {
     public void runGuildTaxCycle(CommandSender initiator, boolean forced) {
         Economy econ = (economy() == null) ? null : economy().econ();
         if (econ == null) {
-            initiator.sendMessage("§cEconomy is not available. Cannot run guild tax.");
+            initiator.sendMessage("§7[§aGuild§7] §cEconomy is not available. Cannot run guild tax.");
             return;
         }
 
@@ -261,7 +261,7 @@ public final class MagicEraGuildsPlugin extends JavaPlugin {
         saveConfig();
 
         String reason = forced ? "forced" : "scheduled";
-        initiator.sendMessage("§aGuild tax cycle (" + reason + ") complete. Members charged: §f"
+        initiator.sendMessage("§7[§aGuild§7] §aGuild tax cycle (" + reason + ") complete. Members charged: §f"
                 + chargedMembers + "§a, failed charges: §f" + failedMembers
                 + "§a, total: §f$" + String.format("%.2f", totalCollected));
     }
