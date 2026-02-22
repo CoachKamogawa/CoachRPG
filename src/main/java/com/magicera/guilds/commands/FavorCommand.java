@@ -23,7 +23,7 @@ public final class FavorCommand implements CommandExecutor {
         // /favor -> open menu
         if (args.length == 0) {
             if (!(sender instanceof Player player)) {
-                sender.sendMessage("§cPlayers only.");
+                sender.sendMessage("§7[§6Favor§7] §cPlayers only.");
                 return true;
             }
             player.openInventory(Menus.favorMenu(plugin, player.getUniqueId()));
@@ -33,7 +33,7 @@ public final class FavorCommand implements CommandExecutor {
         // Admin tools (optional but useful): /favor set <player> <score>
         // Also supports /favor add <player> <amount>
         if (!sender.hasPermission("magicera.admin")) {
-            sender.sendMessage("§cNo permission.");
+            sender.sendMessage("§7[§6Favor§7] §cNo permission.");
             return true;
         }
 
@@ -41,14 +41,14 @@ public final class FavorCommand implements CommandExecutor {
 
         if (sub.equals("set")) {
             if (args.length < 3) {
-                sender.sendMessage("§cUsage: /favor set <player> <score>");
-                sender.sendMessage("§7Range: -100 to 100");
+                sender.sendMessage("§7[§6Favor§7] §cUsage: /favor set <player> <score>");
+                sender.sendMessage("§7[§6Favor§7] §7Range: -100 to 100");
                 return true;
             }
 
             Player target = Bukkit.getPlayerExact(args[1]);
             if (target == null) {
-                sender.sendMessage("§cPlayer must be online.");
+                sender.sendMessage("§7[§6Favor§7] §cPlayer must be online.");
                 return true;
             }
 
@@ -56,7 +56,7 @@ public final class FavorCommand implements CommandExecutor {
             try {
                 score = Integer.parseInt(args[2]);
             } catch (NumberFormatException e) {
-                sender.sendMessage("§cScore must be a number (-100..100).");
+                sender.sendMessage("§7[§6Favor§7] §cScore must be a number (-100..100).");
                 return true;
             }
 
@@ -66,22 +66,22 @@ public final class FavorCommand implements CommandExecutor {
             pd.setAlignmentScore(score);
             plugin.storage().save();
 
-            sender.sendMessage("§aSet §f" + target.getName() + "§a Favor to §f" + score + "§a.");
-            target.sendMessage("§7[§bMagic Era§7] §fYour Favor is now §f" + score + "§f.");
+            sender.sendMessage("§7[§6Favor§7] §aSet §f" + target.getName() + "§a Favor to §f" + score + "§a.");
+            target.sendMessage("§7[§6Favor§7] §fYour Favor is now §f" + score + "§f.");
             if (plugin.alignmentWatcher() != null) plugin.alignmentWatcher().checkAndWarn(target, false);
             return true;
         }
 
         if (sub.equals("add")) {
             if (args.length < 3) {
-                sender.sendMessage("§cUsage: /favor add <player> <amount>");
-                sender.sendMessage("§7Example: /favor add Kaosuu -5");
+                sender.sendMessage("§7[§6Favor§7] §cUsage: /favor add <player> <amount>");
+                sender.sendMessage("§7[§6Favor§7] §7Example: /favor add Kaosuu -5");
                 return true;
             }
 
             Player target = Bukkit.getPlayerExact(args[1]);
             if (target == null) {
-                sender.sendMessage("§cPlayer must be online.");
+                sender.sendMessage("§7[§6Favor§7] §cPlayer must be online.");
                 return true;
             }
 
@@ -89,7 +89,7 @@ public final class FavorCommand implements CommandExecutor {
             try {
                 add = Integer.parseInt(args[2]);
             } catch (NumberFormatException e) {
-                sender.sendMessage("§cAmount must be a number.");
+                sender.sendMessage("§7[§6Favor§7] §cAmount must be a number.");
                 return true;
             }
 
@@ -98,16 +98,16 @@ public final class FavorCommand implements CommandExecutor {
             pd.setAlignmentScore(newScore);
             plugin.storage().save();
 
-            sender.sendMessage("§aAdded §f" + add + "§a Favor to §f" + target.getName() + "§a. New: §f" + newScore);
-            target.sendMessage("§7[§bMagic Era§7] §fYour Favor changed by §f" + add + "§f. New: §f" + newScore);
+            sender.sendMessage("§7[§6Favor§7] §aAdded §f" + add + "§a Favor to §f" + target.getName() + "§a. New: §f" + newScore);
+            target.sendMessage("§7[§6Favor§7] §fYour Favor changed by §f" + add + "§f. New: §f" + newScore);
             if (plugin.alignmentWatcher() != null) plugin.alignmentWatcher().checkAndWarn(target, false);
             return true;
         }
 
-        sender.sendMessage("§cUnknown subcommand.");
-        sender.sendMessage("§7/favor");
-        sender.sendMessage("§7/favor set <player> <score> §8(admin)");
-        sender.sendMessage("§7/favor add <player> <amount> §8(admin)");
+        sender.sendMessage("§7[§6Favor§7] §cUnknown subcommand.");
+        sender.sendMessage("§7[§6Favor§7] §7/favor");
+        sender.sendMessage("§7[§6Favor§7] §7/favor set <player> <score> §8(admin)");
+        sender.sendMessage("§7[§6Favor§7] §7/favor add <player> <amount> §8(admin)");
         return true;
     }
 
