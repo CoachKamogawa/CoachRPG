@@ -3,8 +3,8 @@ package com.magicera.guilds.listeners;
 import com.magicera.guilds.MagicEraGuildsPlugin;
 import com.magicera.guilds.data.Guild;
 import com.magicera.guilds.data.PlayerData;
+import com.magicera.guilds.util.Text;
 import com.nisovin.magicspells.events.SpellTargetEvent;
-import net.kyori.adventure.text.Component;
 import org.bukkit.Material;
 import org.bukkit.block.Block;
 import org.bukkit.entity.Entity;
@@ -13,9 +13,9 @@ import org.bukkit.entity.Projectile;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
+import org.bukkit.event.block.Action;
 import org.bukkit.event.block.BlockBreakEvent;
 import org.bukkit.event.block.BlockPlaceEvent;
-import org.bukkit.event.EventHandler;
 import org.bukkit.event.entity.EntityCombustByEntityEvent;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
@@ -33,7 +33,8 @@ public final class GuildProtectionListener implements Listener {
             Material.CHEST, Material.TRAPPED_CHEST, Material.BARREL,
             Material.FURNACE, Material.BLAST_FURNACE, Material.SMOKER,
             Material.HOPPER, Material.DISPENSER, Material.DROPPER,
-            Material.SHULKER_BOX, Material.ENDER_CHEST
+            Material.SHULKER_BOX, Material.ENDER_CHEST,
+            Material.BREWING_STAND, Material.CRAFTER
     );
 
     private final MagicEraGuildsPlugin plugin;
@@ -64,12 +65,33 @@ public final class GuildProtectionListener implements Listener {
     @EventHandler(ignoreCancelled = true)
     public void onInteract(PlayerInteractEvent event) {
         if (event.getClickedBlock() == null) return;
-        Block b = event.getClickedBlock();
-        if (b.getState() instanceof InventoryHolder || CONTAINER_MATERIALS.contains(b.getType())) {
-            if (!canBuild(event.getPlayer(), b)) {
+        Action action = event.getAction();
+        if (action != Action.RIGHT_CLICK_BLOCK && action != Action.PHYSICAL) return;
+
+        Block block = event.getClickedBlock();
+        Player player = event.getPlayer();
+        Guild owner = ownerOf(block);
+        if (owner == null) return;
+
+        PlayerData pd = plugin.storage().getOrCreatePlayer(player.getUniqueId());
+        String playerGuildId = pd.getGuildId();
+        boolean sameGuild = owner.getId().equals(playerGuildId);
+        Guild playerGuild = playerGuildId == null ? null : plugin.storage().getGuild(playerGuildId);
+        boolean enemyAtWar = playerGuild != null
+                && playerGuild.getEnemies().contains(owner.getId())
+                && owner.getEnemies().contains(playerGuild.getId());
+
+        if (isContainer(block)) {
+            if (!sameGuild) {
                 event.setCancelled(true);
-                event.getPlayer().sendMessage("§cYou cannot access containers in this claim.");
+                player.sendMessage("§cYou cannot access containers in this claim.");
             }
+            return;
+        }
+
+        if (!sameGuild && !enemyAtWar && !canBuild(player, block)) {
+            event.setCancelled(true);
+            player.sendMessage("§cThis land is claimed.");
         }
     }
 
@@ -136,7 +158,7 @@ public final class GuildProtectionListener implements Listener {
             if (!prev.isEmpty()) {
                 Guild previousOwner = plugin.storage().getGuild(prev);
                 if (previousOwner != null) {
-                    player.sendActionBar(Component.text("Leaving " + previousOwner.getName() + " territory."));
+                    showLeavingTerritoryTitle(player, previousOwner.getName());
                 }
             }
             return;
@@ -147,6 +169,22 @@ public final class GuildProtectionListener implements Listener {
                 : "§7" + owner.getDescription();
 
         player.sendTitle("§f[" + owner.getName() + "§f]", sub, 5, 50, 10);
+    }
+
+    private void showLeavingTerritoryTitle(Player player, String guildName) {
+        String safeGuildName = truncateGuildNameForLeavingTitle(guildName);
+        player.sendTitle("§fLeaving " + safeGuildName + " territory.", "", 5, 35, 10);
+    }
+
+    private String truncateGuildNameForLeavingTitle(String guildName) {
+        String plain = guildName == null ? "Guild" : Text.stripColors(guildName);
+        int maxGuildChars = 24;
+        if (plain.length() <= maxGuildChars) return plain;
+        return plain.substring(0, Math.max(1, maxGuildChars - 3)) + "...";
+    }
+
+    private boolean isContainer(Block block) {
+        return block.getState() instanceof InventoryHolder || CONTAINER_MATERIALS.contains(block.getType());
     }
 
     private boolean canBuild(Player player, Block block) {
