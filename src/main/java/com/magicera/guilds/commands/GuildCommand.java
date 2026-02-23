@@ -1979,10 +1979,16 @@ public final class GuildCommand implements TabExecutor {
 
         double power = plugin.guildPower().guildPower(g);
         int maxPower = plugin.guildPower().maxGuildPower(g);
-        int claimsUsed = g.getClaimedChunks().size();
+
+        int totalClaims = g.getClaimedChunks().size();
+        int hallUsed = g.hasHall() ? g.getHallChunks().size() : 0;
+        int hallMax = 9;
+        int expansionUsed = Math.max(0, totalClaims - hallUsed);
+
         var allowedClaims = plugin.guildPower().getAllowedClaimsBreakdown(g);
         int maxClaims = allowedClaims.maxClaims();
-        int supportedClaims = allowedClaims.supportedClaims();
+        int supportedClaimsRaw = allowedClaims.supportedClaimsRaw();
+        int expansionCap = Math.max(0, Math.min(maxClaims, supportedClaimsRaw) - hallMax);
 
         plugin.getLogger().info("[GUILD-INFO DEBUG] guild=" + g.getId()
                 + " memberCount=" + allowedClaims.memberCount()
@@ -1992,25 +1998,23 @@ public final class GuildCommand implements TabExecutor {
                 + " formulaBranch=" + allowedClaims.formulaBranch());
 
         String hallStatus = "None";
-        boolean hallVulnerable = false;
         if (g.hasHall()) {
             int atRisk = plugin.guildPower().hallAtRiskThreshold(g);
             int vulnerable = plugin.guildPower().hallVulnerableThreshold(g);
             if (power <= vulnerable) {
                 hallStatus = "Vulnerable";
-                hallVulnerable = true;
             } else if (power <= atRisk) hallStatus = "At Risk";
             else hallStatus = "Protected";
         }
-
-        int stableClaimsDisplay = hallVulnerable ? 0 : supportedClaims;
 
         viewer.sendMessage("§7Bank: §f$" + fmt(g.getBankBalance()));
         viewer.sendMessage("§7Tax: §f" + g.getTaxPercent() + "%");
         viewer.sendMessage("§7Next tax: §f" + new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm").format(new java.util.Date(plugin.nextGuildTaxEpochMs())));
         viewer.sendMessage("§7Allies: §f" + formatGuildList(g.getAllies()));
         viewer.sendMessage("§7Enemies: §f" + formatGuildList(g.getEnemies()));
-        viewer.sendMessage("§7Claims: §f" + claimsUsed + "§7/§f" + maxClaims + " §8(stable claims: §e" + stableClaimsDisplay + "§8, supported: §e" + supportedClaims + "§8)");
+        viewer.sendMessage("§7Guild Hall: §f" + hallUsed + "§7/§f" + hallMax);
+        viewer.sendMessage("§7Expansion Claims: §f" + expansionUsed + "§7/§f" + expansionCap
+                + (expansionUsed > expansionCap ? " §c(UNSTABLE)" : ""));
         viewer.sendMessage("§7Hall Status: §f" + hallStatus);
         viewer.sendMessage("§7Guild Power: §f" + fmt(power) + "§7/§f" + maxPower);
         viewer.sendMessage("§8§m--------------------------------");
