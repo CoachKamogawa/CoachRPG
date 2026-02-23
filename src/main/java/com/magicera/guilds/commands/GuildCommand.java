@@ -1715,7 +1715,7 @@ public final class GuildCommand implements TabExecutor {
             if (balance < amount) {
                 sendRegistrationTargetMessage(target, "registerInsufficientFunds");
                 logRegistrationDebug("insufficient-funds", "target=" + targetName + " balance=" + fmt(balance) + " required=" + fmt(amount));
-                sender.sendMessage("§7[§aGuild§7] §e" + targetName + " has insufficient funds.");
+                sender.sendMessage("§7[§aGuild§7] §e" + targetName + " has insufficient funds. Registration not applied.");
                 return true;
             }
 
@@ -1737,7 +1737,7 @@ public final class GuildCommand implements TabExecutor {
             plugin.storage().save();
             logRegistrationDebug("playerdata-after", "target=" + targetName + " canCreateGuild=" + targetPd.canCreateGuild());
 
-            sendRegistrationTargetMessage(target, "registerSuccess");
+            sendRegistrationTargetMessage(target, "registerSuccess", "%cost%", fmt(amount));
             logRegistrationDebug("register-success", "target=" + targetName + " charged=" + fmt(amount));
             sender.sendMessage("§7[§aGuild§7] §aRegistered §f" + targetName + "§a. Charged §f$" + fmt(amount) + "§a.");
             return true;
@@ -2176,24 +2176,55 @@ private void sendGuildInfo(Player viewer, Guild g) {
 }
 
     private String registrationPlayerMessage(String key) {
-        return Text.color(plugin.getConfig().getString("guildRegistration.messages." + key,
-                "&7[&aGuild&7] &cYou are not registered to create a guild."));
+        return registrationMessage(key, "&7[&aGuild&7] &cYou are not registered to create a guild.");
     }
 
     private String registrationSenderMessage(String key) {
-        String message = Text.color(plugin.getConfig().getString("guildRegistration.messages." + key,
-                "&7[&aGuild&7] &cAction failed."));
+        String message = registrationMessage(key, "&7[&aGuild&7] &cAction failed.");
         logRegistrationDebug("message-sender", "key=" + key + " text=" + message);
         return message;
     }
 
-    private void sendRegistrationTargetMessage(OfflinePlayer target, String key) {
-        String message = Text.color(plugin.getConfig().getString("guildRegistration.messages." + key, ""));
+    private String registrationMessage(String key, String fallback) {
+        String path = "guildRegistration.messages." + key;
+        String value = plugin.getConfig().getString(path);
+        if (value == null || value.isBlank()) {
+            plugin.getLogger().warning("Missing or blank registration message config for " + path + ". Using fallback message.");
+            value = fallback;
+        }
+        return Text.color(value);
+    }
+
+    private void sendRegistrationTargetMessage(OfflinePlayer target, String key, String... placeholders) {
+        String fallback;
+        if ("registerAlreadyInGuild".equals(key)) {
+            fallback = "&7[&aGuild&7] &cYou are already in a guild! You must leave if you want to register your own.";
+        } else if ("registerInsufficientFunds".equals(key)) {
+            fallback = "&7[&aGuild&7] &cYou don't have the funds to register a Guild";
+        } else if ("registerSuccess".equals(key)) {
+            fallback = "&7[&aGuild&7] &aYou have registered to create a Guild! You were charged &f$%cost%&a.";
+        } else if ("unregisterNotice".equals(key)) {
+            fallback = "&7[&aGuild&7] &eYour guild creation registration has been revoked.";
+        } else {
+            fallback = "&7[&aGuild&7] &cAction failed.";
+        }
+
+        String message = registrationMessage(key, fallback);
+        boolean costProvided = false;
+        for (int i = 0; i + 1 < placeholders.length; i += 2) {
+            if ("%cost%".equals(placeholders[i])) costProvided = true;
+            message = message.replace(placeholders[i], placeholders[i + 1]);
+        }
+        // Only apply a fallback if the message still contains %cost% and nothing provided it.
+        if (!costProvided && message.contains("%cost%")) {
+            message = message.replace("%cost%", "0.00");
+        }
+    
         logRegistrationDebug("message-target", "key=" + key
                 + " targetUuid=" + (target == null ? "null" : target.getUniqueId())
                 + " targetOnline=" + (target != null && target.isOnline())
                 + " text=" + message);
-        if (message == null || message.isBlank() || target == null) return;
+        if (message.isBlank() || target == null) return;
 
         Player online = target.getPlayer();
         if (online != null) {
