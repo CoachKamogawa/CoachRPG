@@ -192,8 +192,15 @@ public final class MagicEraGuildsPlugin extends JavaPlugin {
 
     private void startRecurringTasks() {
         int intervalSeconds = Math.max(30, getConfig().getInt("data.save-interval-seconds", 120));
-        autoSaveTask = Bukkit.getScheduler().runTaskTimerAsynchronously(this, () -> {
-            try { storage.save(); } catch (Exception ignored) {}
+        // IMPORTANT: saving must happen on the main thread because the in-memory model
+        // (guilds/players + nested collections) is mutated by commands/listeners on the main thread.
+        // Async iteration here can cause ConcurrentModificationException or partial snapshots.
+        autoSaveTask = Bukkit.getScheduler().runTaskTimer(this, () -> {
+            try {
+                storage.save();
+            } catch (Exception e) {
+                getLogger().warning("Auto-save failed: " + (e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage()));
+            }
         }, 20L * intervalSeconds, 20L * intervalSeconds);
 
         guildTaxTask = Bukkit.getScheduler().runTaskTimer(this, () -> {
@@ -274,10 +281,18 @@ public final class MagicEraGuildsPlugin extends JavaPlugin {
         if (guildMaintenanceTask != null) guildMaintenanceTask.cancel();
 
         if (territoryConfig != null && territoryFile != null) {
-            try { territoryConfig.save(territoryFile); } catch (Exception ignored) {}
+            try {
+                territoryConfig.save(territoryFile);
+            } catch (Exception e) {
+                getLogger().warning("Failed to save territory.yml on disable: " + (e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage()));
+            }
         }
         if (storage != null) {
-            try { storage.save(); } catch (Exception ignored) {}
+            try {
+                storage.save();
+            } catch (Exception e) {
+                getLogger().warning("Failed to save storage on disable: " + (e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage()));
+            }
         }
         getConfig().set("economy.next-guild-tax-epoch-ms", nextGuildTaxEpochMs);
         saveConfig();
