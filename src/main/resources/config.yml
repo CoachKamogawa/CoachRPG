@@ -33,3 +33,15 @@ alignment:
     dark:
       login: "&7[&aGuild&7] &cYou are out of favor with your guild. You have &e%timeleft% &cto restore your %restore%&c."
       repeat: "&7[&aGuild&7] &cYou are out of favor with your guild. You have &e%timeleft% &cto restore your %restore%&c."
+
+
+guildRegistration:
+  cost: 10000.0
+  messages:
+    noPermissionCreate: "&7[&aGuild&7] &cYou are not registered to create a guild."
+    registerSuccess: "&7[&aGuild&7] &aYou have been registered and may now create one guild."
+    registerInsufficientFunds: "&7[&aGuild&7] &cYou do not have enough funds for guild registration."
+    registerAlreadyInGuild: "&7[&aGuild&7] &cYou are already in a guild and cannot be registered."
+    unregisterNotice: "&7[&aGuild&7] &eYour guild creation registration has been revoked."
+    vaultMissing: "&7[&aGuild&7] &cVault economy is missing; cannot process registration."
+    playerNotFound: "&7[&aGuild&7] &cPlayer not found: &f%player%"
