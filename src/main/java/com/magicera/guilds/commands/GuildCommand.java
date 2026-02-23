@@ -307,7 +307,7 @@ public final class GuildCommand implements TabExecutor {
                     break;
                 }
             }
-            
+
             int maxClaims = plugin.guildPower().getMaxClaims(g);
             int supportedClaims = plugin.guildPower().getSupportedClaims(g);
             int enforcedLimit = Math.min(maxClaims, supportedClaims);
@@ -1992,20 +1992,25 @@ public final class GuildCommand implements TabExecutor {
                 + " formulaBranch=" + allowedClaims.formulaBranch());
 
         String hallStatus = "None";
+        boolean hallVulnerable = false;
         if (g.hasHall()) {
             int atRisk = plugin.guildPower().hallAtRiskThreshold(g);
             int vulnerable = plugin.guildPower().hallVulnerableThreshold(g);
-            if (power <= vulnerable) hallStatus = "Vulnerable";
-            else if (power <= atRisk) hallStatus = "At Risk";
+            if (power <= vulnerable) {
+                hallStatus = "Vulnerable";
+                hallVulnerable = true;
+            } else if (power <= atRisk) hallStatus = "At Risk";
             else hallStatus = "Protected";
         }
+
+        int stableClaimsDisplay = hallVulnerable ? 0 : supportedClaims;
 
         viewer.sendMessage("§7Bank: §f$" + fmt(g.getBankBalance()));
         viewer.sendMessage("§7Tax: §f" + g.getTaxPercent() + "%");
         viewer.sendMessage("§7Next tax: §f" + new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm").format(new java.util.Date(plugin.nextGuildTaxEpochMs())));
         viewer.sendMessage("§7Allies: §f" + formatGuildList(g.getAllies()));
         viewer.sendMessage("§7Enemies: §f" + formatGuildList(g.getEnemies()));
-        viewer.sendMessage("§7Claims: §f" + claimsUsed + "§7/§f" + maxClaims + " §8(stable claims: §e" + supportedClaims + "§8)");
+        viewer.sendMessage("§7Claims: §f" + claimsUsed + "§7/§f" + maxClaims + " §8(stable claims: §e" + stableClaimsDisplay + "§8, supported: §e" + supportedClaims + "§8)");
         viewer.sendMessage("§7Hall Status: §f" + hallStatus);
         viewer.sendMessage("§7Guild Power: §f" + fmt(power) + "§7/§f" + maxPower);
         viewer.sendMessage("§8§m--------------------------------");
@@ -2343,7 +2348,7 @@ public final class GuildCommand implements TabExecutor {
                 + " §fhas declared war against "
                 + Text.color(target.getName())
                 + "§f!");
-        
+
         notifyGuildMaster(target, "§7[§aGuild§7] §cYour guild is now at war with " + Text.color(actor.getName()) + "§c.");
         plugin.guildPower().handlePowerThresholds(actor);
         plugin.guildPower().handlePowerThresholds(target);
