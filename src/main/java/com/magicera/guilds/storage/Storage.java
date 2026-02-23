@@ -241,6 +241,7 @@ public final class Storage {
                     pd.setGuildTitle(pSec.getString(uuidStr + ".guildTitle", ""));
                     pd.setLastSeenEpochMs(pSec.getLong(uuidStr + ".lastSeenEpochMs", System.currentTimeMillis()));
                     pd.setGuildChatEnabled(pSec.getBoolean(uuidStr + ".guildChatEnabled", false));
+                    pd.setCanCreateGuild(pSec.getBoolean(uuidStr + ".canCreateGuild", false));
                     pd.setPower(pSec.getDouble(uuidStr + ".power", 10.0));
 
                     // offline tax notice accumulator
@@ -405,6 +406,7 @@ public final class Storage {
             playersYaml.set(base + ".guildTitle", p.getGuildTitle());
             playersYaml.set(base + ".lastSeenEpochMs", p.getLastSeenEpochMs());
             playersYaml.set(base + ".guildChatEnabled", p.isGuildChatEnabled());
+            playersYaml.set(base + ".canCreateGuild", p.canCreateGuild());
             playersYaml.set(base + ".power", p.getPower());
 
             // offline tax notice accumulator
