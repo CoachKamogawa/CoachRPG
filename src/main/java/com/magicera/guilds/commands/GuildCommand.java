@@ -918,16 +918,16 @@ public final class GuildCommand implements TabExecutor {
                 sender.sendMessage("§7[§aGuild§7] §cOnly the Guild Master can rename the guild.");
                 return true;
             }
-            if (args.length < 2) {
-                sender.sendMessage("§cUsage: /guild rename \"<name>\"");
+
+            ParsedCreate parsed = parseCreateArgs(args);
+            if (parsed == null) {
+                sender.sendMessage("§cUsage: /guild rename \"<name>\" <tag>");
+                sender.sendMessage("§7Example: §f/guild rename \"White Rose\" &aWR");
                 return true;
             }
 
-            String rawName = parseGuildNameArg(args, 1);
-            if (rawName == null) {
-                sender.sendMessage("§cUsage: /guild rename \"<name>\"");
-                return true;
-            }
+            String rawName = parsed.guildName;
+            String rawPrefix = parsed.displayName;
             if (!isBoldOnlyName(rawName)) {
                 sender.sendMessage("§7[§aGuild§7] §cGuild names may only use bold formatting (&l). No underline/italic/strikethrough/magic/reset.");
                 return true;
@@ -943,11 +943,30 @@ public final class GuildCommand implements TabExecutor {
                 return true;
             }
 
+            String prefixStripped = Text.stripColors(rawPrefix);
+            if (prefixStripped == null) prefixStripped = "";
+            prefixStripped = prefixStripped.trim();
+
+            if (prefixStripped.length() < 2 || prefixStripped.length() > 4) {
+                sender.sendMessage("§7[§aGuild§7] §cguild tag must be 2-4 characters (colors allowed).");
+                return true;
+            }
+
+            String currentPrefixStripped = Text.stripColors(g.getPrefix());
+            if (currentPrefixStripped == null) currentPrefixStripped = "";
+            if (!currentPrefixStripped.equalsIgnoreCase(prefixStripped)
+                    && plugin.storage().prefixInUse(Text.color(rawPrefix))) {
+                sender.sendMessage("§cThat guild tag is already in use.");
+                return true;
+            }
+
             String oldName = g.getName();
+            String oldPrefix = g.getPrefix();
             g.setName(rawName);
-            g.addLogEntry("Guild renamed from " + oldName + " to " + rawName + " by " + player.getName());
+            g.setPrefix(rawPrefix);
+            g.addLogEntry("Guild renamed from " + oldName + " [" + oldPrefix + "] to " + rawName + " [" + rawPrefix + "] by " + player.getName());
             plugin.storage().save();
-            Bukkit.broadcastMessage("§7[§bMagic Era§7] " + oldName + " §fhas been renamed to " + rawName + "§f.");
+            Bukkit.broadcastMessage("§7[§bMagic Era§7] " + oldName + " §fhas been renamed to " + rawName + "§f. §7[" + oldPrefix + "§7] §f→ §7[" + g.getPrefix() + "§7]");
             return true;
         }
 
@@ -1854,7 +1873,7 @@ public final class GuildCommand implements TabExecutor {
             if (role == GuildRole.MASTER) {
                 sender.sendMessage("§7/guild newmaster <player>");
                 sender.sendMessage("§7/guild desc <description>");
-                sender.sendMessage("§7/guild rename \"<name>\"");
+                sender.sendMessage("§7/guild rename \"<name>\" <tag>");
                 sender.sendMessage("§7/guild disband §8(then confirm)");
             }
             return;
@@ -2363,7 +2382,7 @@ public final class GuildCommand implements TabExecutor {
                 + " §fhas declared war against "
                 + Text.color(target.getName())
                 + "§f!");
-        
+
         callAlliesToWar(actor, target, actor, warEnd, warSessionId, sideA, sideB);
         callAlliesToWar(target, actor, actor, warEnd, warSessionId, sideB, sideA);
 
