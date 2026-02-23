@@ -1650,24 +1650,23 @@ public final class GuildCommand implements TabExecutor {
         }
 
         // -------------------------
-        // REGISTER / UNREGISTER (console-only admin)
+        // REGISTER / UNREGISTER
         // -------------------------
         if (sub.equals("register")) {
-            if (sender instanceof Player) {
-                sender.sendMessage("§7[§aGuild§7] §cThis command is console-only.");
-                return true;
-            }
-            if (!sender.hasPermission("magicera.admin")) {
-                sender.sendMessage("§7[§aGuild§7] §cNo permission.");
-                return true;
-            }
-            if (args.length < 2) {
+            boolean selfRegister = args.length < 2;
+            if (selfRegister && !(sender instanceof Player)) {
                 sender.sendMessage("§cUsage: /guild register <player>");
                 return true;
             }
-
-            String input = args[1];
-            OfflinePlayer target = Bukkit.getOfflinePlayer(input);
+            if (!selfRegister && !sender.hasPermission("magicera.admin")) {
+                sender.sendMessage("§7[§aGuild§7] §cNo permission.");
+                return true;
+            }
+            
+            String input = selfRegister ? ((Player) sender).getName() : args[1];
+            OfflinePlayer target = selfRegister
+                    ? (Player) sender
+                    : Bukkit.getOfflinePlayer(input);
             if (target == null || (target.getName() == null && !target.hasPlayedBefore())) {
                 sender.sendMessage(registrationSenderMessage("playerNotFound").replace("%player%", input));
                 return true;
@@ -1704,15 +1703,13 @@ public final class GuildCommand implements TabExecutor {
             targetPd.setCanCreateGuild(true);
             plugin.storage().save();
             sendRegistrationTargetMessage(target, "registerSuccess");
-            sender.sendMessage("§7[§aGuild§7] §aRegistered §f" + targetName + "§a. Charged §f$" + fmt(amount) + "§a.");
+            if (!selfRegister || !sender.getName().equalsIgnoreCase(targetName)) {
+                sender.sendMessage("§7[§aGuild§7] §aRegistered §f" + targetName + "§a. Charged §f$" + fmt(amount) + "§a.");
+            }
             return true;
         }
 
         if (sub.equals("unregister")) {
-            if (sender instanceof Player) {
-                sender.sendMessage("§7[§aGuild§7] §cThis command is console-only.");
-                return true;
-            }
             if (!sender.hasPermission("magicera.admin")) {
                 sender.sendMessage("§7[§aGuild§7] §cNo permission.");
                 return true;
