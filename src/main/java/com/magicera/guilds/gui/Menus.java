@@ -42,11 +42,10 @@ public final class Menus {
 
         if (g != null) {
             inv.setItem(11, item(Material.BOOK, "§bYour Guild", lore(
-                    "§7Name: §r" + Text.color(g.getName()),
-                    "§7Your Title: §r" + (pd.getGuildTitle().isEmpty() ? "§7None" : Text.color(pd.getGuildTitle())),
-                    "§7Tag: §7[" + g.getPrefix() + "§7]",
-                    "§7Favor: §f" + AlignmentUtil.displayName(g.getAlignment()),
+                    "§r" + Text.color(g.getName()),
                     "§7Type: §f" + AlignmentUtil.guildTypeName(g.getAlignment()),
+                    "§7Title: §r" + (pd.getGuildTitle().isEmpty() ? "§7None" : Text.color(pd.getGuildTitle())),
+                    "§7Your Power: §f" + String.format(Locale.US, "%.2f", pd.getPower()),
                     "",
                     "§eClick to open"
             )));
@@ -76,7 +75,8 @@ public final class Menus {
         return inv;
     }
 
-    public static Inventory yourGuildMenu(MagicEraGuildsPlugin plugin, Guild g) {
+    public static Inventory yourGuildMenu(MagicEraGuildsPlugin plugin, Guild g, UUID viewer) {
+        PlayerData viewerData = plugin.storage().getOrCreatePlayer(viewer);
         Inventory inv = Bukkit.createInventory(null, 27, TITLE_YOUR_GUILD);
 
         for (int i = 0; i < 9; i++) inv.setItem(i, backPane());
@@ -95,7 +95,8 @@ public final class Menus {
                 "§7Guild: §r" + Text.color(g.getName()),
                 "§7Type: §f" + AlignmentUtil.guildTypeName(g.getAlignment()),
                 "§7Tax Rate: §f" + g.getTaxPercent() + "%",
-                "§7Total Power: §f" + String.format(Locale.US, "%.2f", guildPower(plugin, g))
+                "§7Guild Power: §f" + String.format(Locale.US, "%.2f", guildPower(plugin, g)),
+                "§7Your Power: §f" + String.format(Locale.US, "%.2f", viewerData.getPower())
         )));
 
         return inv;
