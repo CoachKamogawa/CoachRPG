@@ -1,8 +1,8 @@
 package com.magicera.guilds.data;
 
+import java.util.UUID;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.UUID;
 
 public final class PlayerData {
     private final UUID uuid;
@@ -17,7 +17,7 @@ public final class PlayerData {
     private long lastSeenEpochMs;            // epoch ms (updated on quit, and on join init)
     private boolean guildChatEnabled;
 
-    // NEW: registration gate for /guild create
+    // Registration gate for /guild create
     private boolean canCreateGuild;
 
     private double power;
@@ -65,7 +65,7 @@ public final class PlayerData {
     public boolean isGuildChatEnabled() { return guildChatEnabled; }
     public void setGuildChatEnabled(boolean guildChatEnabled) { this.guildChatEnabled = guildChatEnabled; }
 
-    // Registration gate
+    // REQUIRED by GuildCommand
     public boolean canCreateGuild() { return canCreateGuild; }
     public void setCanCreateGuild(boolean canCreateGuild) { this.canCreateGuild = canCreateGuild; }
 
