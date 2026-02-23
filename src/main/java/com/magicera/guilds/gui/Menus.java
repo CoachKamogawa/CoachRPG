@@ -75,6 +75,32 @@ public final class Menus {
         return inv;
     }
 
+    // Backward-compatible overload (MenuListener used to call 2-arg version)
+    public static Inventory yourGuildMenu(MagicEraGuildsPlugin plugin, Guild g) {
+        Inventory inv = Bukkit.createInventory(null, 27, TITLE_YOUR_GUILD);
+
+        for (int i = 0; i < 9; i++) inv.setItem(i, backPane());
+        for (int i = 9; i < 27; i++) inv.setItem(i, filler());
+
+        inv.setItem(11, item(Material.OAK_DOOR, "§bGuild Home", lore("§7Teleport to guild home.")));
+        inv.setItem(12, item(Material.CHEST, "§bGuild Vault", lore("§7Open the guild vault.")));
+        inv.setItem(13, item(Material.PLAYER_HEAD, "§bGuild Members", lore("§7View member list.")));
+        inv.setItem(14, item(Material.IRON_SWORD, "§bRelations", lore("§7Allies and enemies.")));
+        inv.setItem(15, item(Material.WRITABLE_BOOK, "§bGuild Log", lore("§7View guild activity.")));
+
+        inv.setItem(22, item(Material.BOOK, "§bGuild Info", lore(
+                "§7Click to view more details in chat",
+                "",
+                "§7Guild: §r" + Text.color(g.getName()),
+                "§7Type: §f" + AlignmentUtil.guildTypeName(g.getAlignment()),
+                "§7Tax Rate: §f" + g.getTaxPercent() + "%",
+                "§7Guild Power: §f" + String.format(Locale.US, "%.2f", guildPower(plugin, g))
+        )));
+
+        return inv;
+    }
+
+    // New version with viewer-specific data
     public static Inventory yourGuildMenu(MagicEraGuildsPlugin plugin, Guild g, UUID viewer) {
         PlayerData viewerData = plugin.storage().getOrCreatePlayer(viewer);
         Inventory inv = Bukkit.createInventory(null, 27, TITLE_YOUR_GUILD);
