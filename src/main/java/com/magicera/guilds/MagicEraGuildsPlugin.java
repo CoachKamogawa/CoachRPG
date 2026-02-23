@@ -55,6 +55,7 @@ public final class MagicEraGuildsPlugin extends JavaPlugin {
     private BukkitTask guildTaxTask;
     private BukkitTask alignmentWarningTask;
     private BukkitTask guildMaintenanceTask;
+    private BukkitTask backupCleanupTask;
 
     public Storage storage() { return storage; }
     public AlignmentWatcher alignmentWatcher() { return alignmentWatcher; }
@@ -140,6 +141,7 @@ public final class MagicEraGuildsPlugin extends JavaPlugin {
         guildTaxTask = null;
         alignmentWarningTask = null;
         guildMaintenanceTask = null;
+        backupCleanupTask = null;
 
         if (inviteManager != null) inviteManager.clearAll();
 
@@ -192,10 +194,12 @@ public final class MagicEraGuildsPlugin extends JavaPlugin {
 
     private void startRecurringTasks() {
         int intervalSeconds = Math.max(30, getConfig().getInt("data.save-interval-seconds", 120));
-        // IMPORTANT: saving must happen on the main thread because the in-memory model
-        // (guilds/players + nested collections) is mutated by commands/listeners on the main thread.
-        // Async iteration here can cause ConcurrentModificationException or partial snapshots.
+
+        // Save only when something actually changed, and never lose a save due to lock overlap.
         autoSaveTask = Bukkit.getScheduler().runTaskTimer(this, () -> {
+            if (storage == null) return;
+            if (!storage.isDirty()) return;
+
             try {
                 storage.save();
             } catch (Exception e) {
@@ -215,6 +219,33 @@ public final class MagicEraGuildsPlugin extends JavaPlugin {
                 20L * 60L * warnMinutes);
 
         guildMaintenanceTask = Bukkit.getScheduler().runTaskTimer(this, new GuildMaintenanceTask(this), 20L * 60L, 20L * 60L);
+
+        // Backup cleanup (keeps .bak from lingering forever if you stop saving for a long time).
+        // Default: 7 days (weekly). Runs daily.
+        int retentionDays = Math.max(1, getConfig().getInt("data.backup-retention-days", 7));
+        long retentionMs = retentionDays * 24L * 60L * 60L * 1000L;
+
+        backupCleanupTask = Bukkit.getScheduler().runTaskTimer(this, () -> {
+            File dir = getDataFolder();
+            if (dir == null || !dir.exists()) return;
+
+            long now = System.currentTimeMillis();
+            File[] files = dir.listFiles();
+            if (files == null) return;
+
+            for (File f : files) {
+                if (!f.isFile()) continue;
+
+                String name = f.getName().toLowerCase();
+                if (name.endsWith(".bak") || name.endsWith(".tmp")) {
+                    long age = now - f.lastModified();
+                    if (age >= retentionMs) {
+                        //noinspection ResultOfMethodCallIgnored
+                        f.delete();
+                    }
+                }
+            }
+        }, 20L * 60L, 20L * 60L * 60L * 24L);
     }
 
     public void runGuildTaxCycle(CommandSender initiator, boolean forced) {
@@ -261,6 +292,7 @@ public final class MagicEraGuildsPlugin extends JavaPlugin {
             }
         }
 
+        storage.markDirty();
         storage.save();
 
         nextGuildTaxEpochMs = System.currentTimeMillis() + WEEK_MS;
@@ -279,6 +311,7 @@ public final class MagicEraGuildsPlugin extends JavaPlugin {
         if (guildTaxTask != null) guildTaxTask.cancel();
         if (alignmentWarningTask != null) alignmentWarningTask.cancel();
         if (guildMaintenanceTask != null) guildMaintenanceTask.cancel();
+        if (backupCleanupTask != null) backupCleanupTask.cancel();
 
         if (territoryConfig != null && territoryFile != null) {
             try {
