@@ -2035,11 +2035,9 @@ private void sendGuildInfo(Player viewer, Guild g) {
     viewer.sendMessage("§7Allies: §f" + formatGuildList(g.getAllies()));
     viewer.sendMessage("§7Enemies: §f" + formatGuildList(g.getEnemies()));
     viewer.sendMessage("§7Guild Hall: §f" + hallUsed + "§7/§f" + hallMax);
-
-    viewer.sendMessage("§7Expansion Claims: §f" + expansionUsed + "§7/§f" + expansionCap + " §7(unprotected: §f" + unprotected + "§7)");
-    viewer.sendMessage("§7Expansion Status: §f" + expansionStatus);
-
     viewer.sendMessage("§7Hall Status: §f" + hallStatus);
+    viewer.sendMessage("§7Expansion Claims: §f" + expansionUsed + "§7/§f" + expansionCap + " §8(unprotected: §e" + unprotected + "§8)");
+    viewer.sendMessage("§7Expansion Status: §f" + expansionStatus);
     viewer.sendMessage("§7Guild Power: §f" + fmt(power) + "§7/§f" + maxPower);
     viewer.sendMessage("§8§m--------------------------------");
 }
