@@ -11,6 +11,10 @@ import org.bukkit.plugin.java.JavaPlugin;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.AtomicMoveNotSupportedException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.util.*;
 import java.util.concurrent.locks.ReentrantLock;
 
@@ -426,20 +430,51 @@ public final class Storage {
                 playersYaml.set(base + ".pendingGuildMessages", new ArrayList<>(p.getPendingGuildMessages()));
             }
 
-            try {
-                guildsYaml.save(guildsFile);
-            } catch (IOException e) {
-                plugin.getLogger().warning("Failed to save guilds.yml: " + e.getMessage());
-            }
-
-            try {
-                playersYaml.save(playersFile);
-            } catch (IOException e) {
-                plugin.getLogger().warning("Failed to save players.yml: " + e.getMessage());
-            }
+            atomicSaveYaml(guildsYaml, guildsFile, "guilds.yml");
+            atomicSaveYaml(playersYaml, playersFile, "players.yml");
 
         } finally {
             saveLock.unlock();
+        }
+    }
+
+    private void atomicSaveYaml(YamlConfiguration yaml, File targetFile, String label) {
+        if (yaml == null || targetFile == null) return;
+
+        File dir = targetFile.getParentFile();
+        if (dir != null && !dir.exists()) {
+            //noinspection ResultOfMethodCallIgnored
+            dir.mkdirs();
+        }
+
+        File tmp = new File(dir, targetFile.getName() + ".tmp");
+        Path target = targetFile.toPath();
+        Path tmpPath = tmp.toPath();
+        Path bak = target.resolveSibling(targetFile.getName() + ".bak");
+
+        try {
+            yaml.save(tmp);
+
+            // Best-effort backup of the last known-good file.
+            if (Files.exists(target)) {
+                try {
+                    Files.copy(target, bak, StandardCopyOption.REPLACE_EXISTING);
+                } catch (Exception ignored) {
+                    // backup failure should not prevent saving
+                }
+            }
+
+            try {
+                Files.move(tmpPath, target, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+            } catch (AtomicMoveNotSupportedException ex) {
+                Files.move(tmpPath, target, StandardCopyOption.REPLACE_EXISTING);
+            }
+        } catch (Exception e) {
+            plugin.getLogger().warning("Failed to save " + label + ": " + (e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage()));
+            try {
+                Files.deleteIfExists(tmpPath);
+            } catch (Exception ignored) {
+            }
         }
     }
 
