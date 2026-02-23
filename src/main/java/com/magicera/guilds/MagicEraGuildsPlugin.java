@@ -32,6 +32,7 @@ import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.scheduler.BukkitTask;
 
 import java.io.File;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -49,6 +50,8 @@ public final class MagicEraGuildsPlugin extends JavaPlugin {
     private EconomyHook economyHook;
     private File territoryFile;
     private YamlConfiguration territoryConfig;
+    private File runtimeDataFile;
+    private YamlConfiguration runtimeDataConfig;
     private long nextGuildTaxEpochMs;
 
     private BukkitTask autoSaveTask;
@@ -120,17 +123,62 @@ public final class MagicEraGuildsPlugin extends JavaPlugin {
     }
 
     public void reloadPluginConfigs() {
-        reloadConfig();
         saveDefaultConfig();
+        reloadConfig();
 
         if (!new File(getDataFolder(), "territory.yml").exists()) {
             saveResource("territory.yml", false);
         }
         territoryFile = new File(getDataFolder(), "territory.yml");
         territoryConfig = YamlConfiguration.loadConfiguration(territoryFile);
+        
+        runtimeDataFile = new File(getDataFolder(), "data.yml");
+        runtimeDataConfig = YamlConfiguration.loadConfiguration(runtimeDataFile);
+
+        validateRegistrationConfig();
 
         long now = System.currentTimeMillis();
-        nextGuildTaxEpochMs = getConfig().getLong("economy.next-guild-tax-epoch-ms", now + WEEK_MS);
+        nextGuildTaxEpochMs = runtimeDataConfig.getLong("economy.next-guild-tax-epoch-ms", now + WEEK_MS);
+    }
+
+    private void validateRegistrationConfig() {
+        if (!getConfig().contains("guildRegistration.cost")) {
+            getLogger().warning("Missing config key guildRegistration.cost. Defaulting to 0.0 until config.yml is corrected.");
+        }
+        if (!getConfig().isConfigurationSection("guildRegistration.messages")) {
+            getLogger().warning("Missing section guildRegistration.messages. Registration feedback messages may not be shown.");
+            return;
+        }
+
+        String[] requiredMessageKeys = {
+                "registerSuccess",
+                "registerInsufficientFunds",
+                "registerAlreadyInGuild",
+                "unregisterNotice",
+                "vaultMissing",
+                "playerNotFound"
+        };
+        for (String key : requiredMessageKeys) {
+            if (!getConfig().contains("guildRegistration.messages." + key)) {
+                getLogger().warning("Missing config key guildRegistration.messages." + key + ". Falling back to built-in message.");
+            }
+        }
+    }
+
+    public void saveRuntimeData() {
+        if (runtimeDataConfig == null) {
+            runtimeDataConfig = new YamlConfiguration();
+        }
+        if (runtimeDataFile == null) {
+            runtimeDataFile = new File(getDataFolder(), "data.yml");
+        }
+
+        runtimeDataConfig.set("economy.next-guild-tax-epoch-ms", nextGuildTaxEpochMs);
+        try {
+            runtimeDataConfig.save(runtimeDataFile);
+        } catch (IOException e) {
+            getLogger().warning("Failed to save data.yml: " + (e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage()));
+        }
     }
 
     public List<String> resetAndReloadPluginConfigs() {
@@ -296,8 +344,7 @@ public final class MagicEraGuildsPlugin extends JavaPlugin {
         storage.save();
 
         nextGuildTaxEpochMs = System.currentTimeMillis() + WEEK_MS;
-        getConfig().set("economy.next-guild-tax-epoch-ms", nextGuildTaxEpochMs);
-        saveConfig();
+        saveRuntimeData();
 
         String reason = forced ? "forced" : "scheduled";
         initiator.sendMessage("§7[§aGuild§7] §aGuild tax cycle (" + reason + ") complete. Members charged: §f"
@@ -327,8 +374,7 @@ public final class MagicEraGuildsPlugin extends JavaPlugin {
                 getLogger().warning("Failed to save storage on disable: " + (e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage()));
             }
         }
-        getConfig().set("economy.next-guild-tax-epoch-ms", nextGuildTaxEpochMs);
-        saveConfig();
+        saveRuntimeData();
         getLogger().info("MagicEraGuilds disabled.");
     }
 
