@@ -36,6 +36,7 @@ alignment:
 
 
 guildRegistration:
+  debug: false
   cost: 10000.0
   messages:
     noPermissionCreate: "&7[&aGuild&7] &cYou are not registered to create a guild."
