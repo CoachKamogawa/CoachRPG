@@ -1002,6 +1002,10 @@ public final class GuildCommand implements TabExecutor {
                 sender.sendMessage("§7[§aGuild§7] §cYou are already in a guild.");
                 return true;
             }
+            if (!pd.canCreateGuild()) {
+                sender.sendMessage(registrationPlayerMessage("noPermissionCreate"));
+                return true;
+            }
 
             ParsedCreate parsed = parseCreateArgs(args);
             if (parsed == null) {
@@ -1047,6 +1051,7 @@ public final class GuildCommand implements TabExecutor {
             g.setAlignment(masterAlign);
 
             g.addLogEntry("Guild created by " + player.getName());
+            pd.setCanCreateGuild(false);
             plugin.storage().save();
 
             sender.sendMessage("§7[§aGuild§7] §aCreated guild: §r" + Text.color(g.getName()) + " §7[" + g.getPrefix() + "§7] §7Favor: §f"
@@ -1645,6 +1650,95 @@ public final class GuildCommand implements TabExecutor {
         }
 
         // -------------------------
+        // REGISTER / UNREGISTER (console-only admin)
+        // -------------------------
+        if (sub.equals("register")) {
+            if (sender instanceof Player) {
+                sender.sendMessage("§7[§aGuild§7] §cThis command is console-only.");
+                return true;
+            }
+            if (!sender.hasPermission("magicera.admin")) {
+                sender.sendMessage("§7[§aGuild§7] §cNo permission.");
+                return true;
+            }
+            if (args.length < 2) {
+                sender.sendMessage("§cUsage: /guild register <player>");
+                return true;
+            }
+
+            String input = args[1];
+            OfflinePlayer target = Bukkit.getOfflinePlayer(input);
+            if (target == null || (target.getName() == null && !target.hasPlayedBefore())) {
+                sender.sendMessage(registrationSenderMessage("playerNotFound").replace("%player%", input));
+                return true;
+            }
+
+            PlayerData targetPd = plugin.storage().getOrCreatePlayer(target.getUniqueId());
+            String targetName = safeName(target.getUniqueId());
+            if (targetPd.getGuildId() != null) {
+                sendRegistrationTargetMessage(target, "registerAlreadyInGuild");
+                sender.sendMessage("§7[§aGuild§7] §e" + targetName + " is already in a guild. Registration not applied.");
+                return true;
+            }
+
+            Economy econ = (plugin.economy() == null) ? null : plugin.economy().econ();
+            if (econ == null) {
+                sender.sendMessage(registrationSenderMessage("vaultMissing"));
+                return true;
+            }
+
+            double amount = Math.max(0.0, plugin.getConfig().getDouble("guildRegistration.cost", 0.0));
+            if (!econ.has(target, amount)) {
+                sendRegistrationTargetMessage(target, "registerInsufficientFunds");
+                sender.sendMessage("§7[§aGuild§7] §e" + targetName + " has insufficient funds for registration.");
+                return true;
+            }
+
+            EconomyResponse r = econ.withdrawPlayer(target, amount);
+            if (!r.transactionSuccess()) {
+                sender.sendMessage("§7[§aGuild§7] §cRegistration charge failed: "
+                        + (r.errorMessage == null ? "unknown error" : r.errorMessage));
+                return true;
+            }
+
+            targetPd.setCanCreateGuild(true);
+            plugin.storage().save();
+            sendRegistrationTargetMessage(target, "registerSuccess");
+            sender.sendMessage("§7[§aGuild§7] §aRegistered §f" + targetName + "§a. Charged §f$" + fmt(amount) + "§a.");
+            return true;
+        }
+
+        if (sub.equals("unregister")) {
+            if (sender instanceof Player) {
+                sender.sendMessage("§7[§aGuild§7] §cThis command is console-only.");
+                return true;
+            }
+            if (!sender.hasPermission("magicera.admin")) {
+                sender.sendMessage("§7[§aGuild§7] §cNo permission.");
+                return true;
+            }
+            if (args.length < 2) {
+                sender.sendMessage("§cUsage: /guild unregister <player>");
+                return true;
+            }
+
+            String input = args[1];
+            OfflinePlayer target = Bukkit.getOfflinePlayer(input);
+            if (target == null || (target.getName() == null && !target.hasPlayedBefore())) {
+                sender.sendMessage(registrationSenderMessage("playerNotFound").replace("%player%", input));
+                return true;
+            }
+
+            PlayerData targetPd = plugin.storage().getOrCreatePlayer(target.getUniqueId());
+            targetPd.setCanCreateGuild(false);
+            plugin.storage().save();
+
+            sendRegistrationTargetMessage(target, "unregisterNotice");
+            sender.sendMessage("§7[§aGuild§7] §aUnregistered §f" + safeName(target.getUniqueId()) + "§a.");
+            return true;
+        }
+
+        // -------------------------
         // FORCE TAX (admin)
         // -------------------------
         if (sub.equals("forcetax")) {
@@ -1705,6 +1799,7 @@ public final class GuildCommand implements TabExecutor {
             }
 
             cleanupGuildBeforeDisband(g);
+            pd.setCanCreateGuild(false);
             plugin.storage().deleteGuild(g.getId());
             plugin.storage().save();
 
@@ -1738,6 +1833,8 @@ public final class GuildCommand implements TabExecutor {
                 subs.add("adminadd");
                 subs.add("adminkick");
                 subs.add("forcetax");
+                subs.add("register");
+                subs.add("unregister");
                 subs.add("thanossnap");
             }
             return filterPrefix(subs, input);
@@ -1796,6 +1893,10 @@ public final class GuildCommand implements TabExecutor {
             return filterPrefix(onlinePlayerNames(), input);
         }
 
+        if ((sub.equals("register") || sub.equals("unregister")) && args.length == 2 && sender.hasPermission("magicera.admin")) {
+            return filterPrefix(onlinePlayerNames(), input);
+        }
+        
         if (sub.equals("impeach") && args.length == 2) {
             return filterPrefix(List.of("remove", "keep"), input);
         }
@@ -1908,7 +2009,7 @@ public final class GuildCommand implements TabExecutor {
             sender.sendMessage("§7/guild claimtoggle");
         }
         if (sender.hasPermission("magicera.admin")) {
-            sender.sendMessage("§7/guild reload | thanossnap | add | adminadd | adminkick | forcetax | power");
+            sender.sendMessage("§7/guild reload | thanossnap | add | adminadd | adminkick | forcetax | power | register | unregister");
         }
     }
 
@@ -2041,6 +2142,26 @@ private void sendGuildInfo(Player viewer, Guild g) {
     viewer.sendMessage("§7Guild Power: §f" + fmt(power) + "§7/§f" + maxPower);
     viewer.sendMessage("§8§m--------------------------------");
 }
+
+    private String registrationPlayerMessage(String key) {
+        return Text.color(plugin.getConfig().getString("guildRegistration.messages." + key,
+                "&7[&aGuild&7] &cYou are not registered to create a guild."));
+    }
+
+    private String registrationSenderMessage(String key) {
+        return Text.color(plugin.getConfig().getString("guildRegistration.messages." + key,
+                "&7[&aGuild&7] &cAction failed."));
+    }
+
+    private void sendRegistrationTargetMessage(OfflinePlayer target, String key) {
+        String message = Text.color(plugin.getConfig().getString("guildRegistration.messages." + key, ""));
+        if (message == null || message.isBlank()) return;
+
+        Player online = target.getPlayer();
+        if (online != null) {
+            online.sendMessage(message);
+        }
+    }
 
     private String formatGuildList(Set<String> ids) {
         if (ids == null || ids.isEmpty()) return "None";
