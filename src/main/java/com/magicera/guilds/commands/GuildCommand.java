@@ -1653,7 +1653,8 @@ public final class GuildCommand implements TabExecutor {
         // REGISTER / UNREGISTER
         // -------------------------
         if (sub.equals("register")) {
-            // Admin-only. Intended for Citizens NPC (console) and admin players.
+
+            // Admin-only. Intended for console, Citizens, or admin players.
             if (!sender.hasPermission("magicera.admin")) {
                 sender.sendMessage("§7[§aGuild§7] §cNo permission.");
                 return true;
@@ -1674,9 +1675,17 @@ public final class GuildCommand implements TabExecutor {
             PlayerData targetPd = plugin.storage().getOrCreatePlayer(target.getUniqueId());
             String targetName = safeName(target.getUniqueId());
 
+            // Already in a guild → do NOT charge or register
             if (targetPd.getGuildId() != null) {
                 sendRegistrationTargetMessage(target, "registerAlreadyInGuild");
                 sender.sendMessage("§7[§aGuild§7] §e" + targetName + " is already in a guild. Registration not applied.");
+                return true;
+            }
+
+            // Already registered → do not charge again
+            if (targetPd.canCreateGuild()) {
+                sendRegistrationTargetMessage(target, "registerSuccess");
+                sender.sendMessage("§7[§aGuild§7] §e" + targetName + " is already registered.");
                 return true;
             }
 
@@ -1687,13 +1696,29 @@ public final class GuildCommand implements TabExecutor {
             }
 
             double amount = Math.max(0.0, plugin.getConfig().getDouble("guildRegistration.cost", 0.0));
-            if (!econ.has(target, amount)) {
+
+            boolean hasFunds;
+            try {
+                hasFunds = econ.has(target, amount);
+            } catch (Throwable t) {
+                hasFunds = target.getName() != null && econ.has(target.getName(), amount);
+            }
+
+            if (!hasFunds) {
                 sendRegistrationTargetMessage(target, "registerInsufficientFunds");
-                sender.sendMessage("§7[§aGuild§7] §e" + targetName + " has insufficient funds for registration.");
+                sender.sendMessage("§7[§aGuild§7] §e" + targetName + " has insufficient funds.");
                 return true;
             }
 
-            EconomyResponse r = econ.withdrawPlayer(target, amount);
+            EconomyResponse r;
+            try {
+                r = econ.withdrawPlayer(target, amount);
+            } catch (Throwable t) {
+                r = target.getName() == null
+                        ? new EconomyResponse(0.0, 0.0, EconomyResponse.ResponseType.FAILURE, "player has no name")
+                        : econ.withdrawPlayer(target.getName(), amount);
+            }
+
             if (!r.transactionSuccess()) {
                 sender.sendMessage("§7[§aGuild§7] §cRegistration charge failed: "
                         + (r.errorMessage == null ? "unknown error" : r.errorMessage));
@@ -1709,10 +1734,12 @@ public final class GuildCommand implements TabExecutor {
         }
 
         if (sub.equals("unregister")) {
+
             if (!sender.hasPermission("magicera.admin")) {
                 sender.sendMessage("§7[§aGuild§7] §cNo permission.");
                 return true;
             }
+
             if (args.length < 2) {
                 sender.sendMessage("§7[§aGuild§7] §cUsage: /guild unregister <player>");
                 return true;
