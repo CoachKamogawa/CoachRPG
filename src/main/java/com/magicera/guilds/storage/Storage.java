@@ -10,7 +10,6 @@ import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import java.io.File;
-import java.io.IOException;
 import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -33,8 +32,20 @@ public final class Storage {
     // Single-writer guard for file IO (prevents overlapping saves from multiple call sites).
     private final ReentrantLock saveLock = new ReentrantLock();
 
+    // "Airtight" save guarantee: if we skip a save due to lock overlap or failure,
+    // keep dirty=true so the next scheduled save will try again.
+    private volatile boolean dirty = false;
+
     public Storage(JavaPlugin plugin) {
         this.plugin = plugin;
+    }
+
+    public boolean isDirty() {
+        return dirty;
+    }
+
+    public void markDirty() {
+        dirty = true;
     }
 
     public void load() {
@@ -74,17 +85,14 @@ public final class Storage {
                 Guild guild = new Guild(guildId, name, prefix, alignment);
                 guild.setTitle(title);
 
-                // description + founded timestamp
                 guild.setDescription(s.getString("description", ""));
                 guild.setFoundedAtEpochMs(s.getLong("foundedAtEpochMs", System.currentTimeMillis()));
 
-                // Bank + tax + officer withdraw window tracking
                 guild.setBankBalance(s.getDouble("bankBalance", 0.0));
                 guild.setTaxPercent(s.getInt("taxPercent", 0));
                 guild.setOfficerWithdrawUsed24h(s.getDouble("officerWithdrawUsed24h", 0.0));
                 guild.setOfficerWithdrawWindowStartMs(s.getLong("officerWithdrawWindowStartMs", 0L));
 
-                // Favor / impeachment / log fields
                 long masterSince = s.getLong("masterOutOfFavorSinceEpochMs", 0L);
                 guild.setMasterOutOfFavorSinceEpochMs(masterSince == 0L ? null : masterSince);
 
@@ -167,11 +175,8 @@ public final class Storage {
                 guild.getEnemies().addAll(s.getStringList("enemies"));
                 guild.getPendingAllyRequests().addAll(s.getStringList("pendingAllyRequests"));
                 guild.getPendingWarRequests().addAll(s.getStringList("pendingWarRequests"));
-
-                // pending truce requests
                 guild.getPendingTruceRequests().addAll(s.getStringList("pendingTruceRequests"));
 
-                // ally/war request cooldowns
                 ConfigurationSection allyCooldowns = s.getConfigurationSection("allyRequestCooldowns");
                 if (allyCooldowns != null) {
                     for (String guildIdKey : allyCooldowns.getKeys(false)) {
@@ -252,10 +257,7 @@ public final class Storage {
                     pd.setCanCreateGuild(pSec.getBoolean(uuidStr + ".canCreateGuild", false));
                     pd.setPower(pSec.getDouble(uuidStr + ".power", 10.0));
 
-                    // offline tax notice accumulator
                     pd.setPendingTaxNoticeAmount(pSec.getDouble(uuidStr + ".pendingTaxNoticeAmount", 0.0));
-
-                    // pending guild messages
                     pd.getPendingGuildMessages().addAll(pSec.getStringList(uuidStr + ".pendingGuildMessages"));
 
                     playersById.put(uuid, pd);
@@ -263,14 +265,19 @@ public final class Storage {
                 }
             }
         }
+
+        // After a clean load, treat state as clean.
+        dirty = false;
     }
 
     public void save() {
         if (!saveLock.tryLock()) {
-            // Another save is already running; skip this cycle.
+            // Another save is running; keep dirty=true so we *must* save next cycle.
+            dirty = true;
             return;
         }
 
+        boolean success = false;
         try {
             if (guildsYaml == null) guildsYaml = new YamlConfiguration();
             if (playersYaml == null) playersYaml = new YamlConfiguration();
@@ -278,26 +285,22 @@ public final class Storage {
             guildsYaml.set("guilds", null);
             playersYaml.set("players", null);
 
-            // Save guilds
             for (Guild g : guildsById.values()) {
                 String base = "guilds." + g.getId();
                 guildsYaml.set(base + ".name", g.getName());
                 guildsYaml.set(base + ".prefix", g.getPrefix());
                 guildsYaml.set(base + ".title", g.getTitle());
 
-                // description + founded timestamp
                 guildsYaml.set(base + ".description", g.getDescription());
                 guildsYaml.set(base + ".foundedAtEpochMs", g.getFoundedAtEpochMs());
 
                 guildsYaml.set(base + ".alignment", g.getAlignment().name());
 
-                // Bank + tax + officer withdraw window tracking
                 guildsYaml.set(base + ".bankBalance", g.getBankBalance());
                 guildsYaml.set(base + ".taxPercent", g.getTaxPercent());
                 guildsYaml.set(base + ".officerWithdrawUsed24h", g.getOfficerWithdrawUsed24h());
                 guildsYaml.set(base + ".officerWithdrawWindowStartMs", g.getOfficerWithdrawWindowStartMs());
 
-                // Favor / impeachment / log fields
                 guildsYaml.set(base + ".masterOutOfFavorSinceEpochMs",
                         g.getMasterOutOfFavorSinceEpochMs() == null ? 0L : g.getMasterOutOfFavorSinceEpochMs());
 
@@ -306,6 +309,7 @@ public final class Storage {
 
                 guildsYaml.set(base + ".impeachmentStartedEpochMs",
                         g.getImpeachmentStartedEpochMs() == null ? 0L : g.getImpeachmentStartedEpochMs());
+
                 guildsYaml.set(base + ".kickLockUntilEpochMs", g.getKickLockUntilEpochMs());
                 guildsYaml.set(base + ".logEntries", g.getLogEntries());
 
@@ -362,11 +366,8 @@ public final class Storage {
                 guildsYaml.set(base + ".enemies", new ArrayList<>(g.getEnemies()));
                 guildsYaml.set(base + ".pendingAllyRequests", new ArrayList<>(g.getPendingAllyRequests()));
                 guildsYaml.set(base + ".pendingWarRequests", new ArrayList<>(g.getPendingWarRequests()));
-
-                // pending truce requests
                 guildsYaml.set(base + ".pendingTruceRequests", new ArrayList<>(g.getPendingTruceRequests()));
 
-                // ally/war request cooldowns
                 String allyCooldownBase = base + ".allyRequestCooldowns";
                 guildsYaml.set(allyCooldownBase, null);
                 for (Map.Entry<String, Long> e : g.getAllyRequestCooldowns().entrySet()) {
@@ -405,7 +406,6 @@ public final class Storage {
                 }
             }
 
-            // Save players
             for (PlayerData p : playersById.values()) {
                 String base = "players." + p.getUuid();
                 playersYaml.set(base + ".guildId", p.getGuildId());
@@ -423,22 +423,24 @@ public final class Storage {
                 playersYaml.set(base + ".canCreateGuild", p.canCreateGuild());
                 playersYaml.set(base + ".power", p.getPower());
 
-                // offline tax notice accumulator
                 playersYaml.set(base + ".pendingTaxNoticeAmount", p.getPendingTaxNoticeAmount());
-
-                // pending guild messages
                 playersYaml.set(base + ".pendingGuildMessages", new ArrayList<>(p.getPendingGuildMessages()));
             }
 
             atomicSaveYaml(guildsYaml, guildsFile, "guilds.yml");
             atomicSaveYaml(playersYaml, playersFile, "players.yml");
 
+            success = true;
+        } catch (Exception e) {
+            plugin.getLogger().warning("Storage save failed: " + (e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage()));
         } finally {
+            // Only clear dirty when we KNOW we saved successfully.
+            dirty = !success;
             saveLock.unlock();
         }
     }
 
-    private void atomicSaveYaml(YamlConfiguration yaml, File targetFile, String label) {
+    private void atomicSaveYaml(YamlConfiguration yaml, File targetFile, String label) throws Exception {
         if (yaml == null || targetFile == null) return;
 
         File dir = targetFile.getParentFile();
@@ -452,34 +454,32 @@ public final class Storage {
         Path tmpPath = tmp.toPath();
         Path bak = target.resolveSibling(targetFile.getName() + ".bak");
 
-        try {
-            yaml.save(tmp);
+        yaml.save(tmp);
 
-            // Best-effort backup of the last known-good file.
-            if (Files.exists(target)) {
-                try {
-                    Files.copy(target, bak, StandardCopyOption.REPLACE_EXISTING);
-                } catch (Exception ignored) {
-                    // backup failure should not prevent saving
-                }
-            }
-
+        // Single backup file only (overwritten). Size will never "grow" beyond the current YAML size.
+        if (Files.exists(target)) {
             try {
-                Files.move(tmpPath, target, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
-            } catch (AtomicMoveNotSupportedException ex) {
-                Files.move(tmpPath, target, StandardCopyOption.REPLACE_EXISTING);
-            }
-        } catch (Exception e) {
-            plugin.getLogger().warning("Failed to save " + label + ": " + (e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage()));
-            try {
-                Files.deleteIfExists(tmpPath);
+                Files.copy(target, bak, StandardCopyOption.REPLACE_EXISTING);
             } catch (Exception ignored) {
+                // backup failure should not prevent saving
             }
+        }
+
+        try {
+            Files.move(tmpPath, target, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+        } catch (AtomicMoveNotSupportedException ex) {
+            Files.move(tmpPath, target, StandardCopyOption.REPLACE_EXISTING);
         }
     }
 
     public PlayerData getOrCreatePlayer(UUID uuid) {
-        return playersById.computeIfAbsent(uuid, PlayerData::new);
+        PlayerData existing = playersById.get(uuid);
+        if (existing != null) return existing;
+
+        PlayerData created = new PlayerData(uuid);
+        playersById.put(uuid, created);
+        dirty = true;
+        return created;
     }
 
     public Guild getGuild(String guildId) {
@@ -520,11 +520,14 @@ public final class Storage {
         PlayerData pd = getOrCreatePlayer(masterUuid);
         pd.setGuildId(id);
 
+        dirty = true;
         return g;
     }
 
     public void deleteGuild(String guildId) {
-        guildsById.remove(guildId);
+        if (guildsById.remove(guildId) != null) {
+            dirty = true;
+        }
     }
 
     public void clearAllData() {
@@ -532,5 +535,6 @@ public final class Storage {
         playersById.clear();
         guildsYaml = new YamlConfiguration();
         playersYaml = new YamlConfiguration();
+        dirty = true;
     }
 }
