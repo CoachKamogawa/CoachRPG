@@ -922,7 +922,7 @@ public final class GuildCommand implements TabExecutor {
             ParsedCreate parsed = parseCreateArgs(args);
             if (parsed == null) {
                 sender.sendMessage("§cUsage: /guild rename \"<name>\" <tag>");
-                sender.sendMessage("§7Example: §f/guild rename \"White Rose\" &aWR");
+                sender.sendMessage("§7Example: §f/guild rename \"&c&lFairy &e&lTail\" &cF&eT");
                 return true;
             }
 
