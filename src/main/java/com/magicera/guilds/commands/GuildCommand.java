@@ -570,8 +570,8 @@ public final class GuildCommand implements TabExecutor {
             g.setAllyFireEnabled(enabled);
             plugin.storage().save();
             sender.sendMessage(enabled
-                    ? "§eAlly fire enabled for your guild. Allied PvP/spells require both guilds to have ally fire on."
-                    : "§aAlly fire disabled for your guild. Allied PvP/spells are now blocked.");
+                    ? "§7[§aGuild§7] §eAlly fire enabled for your guild. Allied PvP/spells require both guilds to have ally fire on."
+                    : "§7[§aGuild§7] §aAlly fire disabled for your guild. Allied PvP/spells are now blocked.");
             return true;
         }
 
@@ -864,7 +864,7 @@ public final class GuildCommand implements TabExecutor {
             g.setTaxPercent(pct);
             g.addLogEntry("Tax set to " + pct + "% by " + player.getName());
             plugin.storage().save();
-            sender.sendMessage("§aGuild tax set to §f" + pct + "%§a.");
+            sender.sendMessage("§7[§aGuild§7] §aGuild tax set to §f" + pct + "%§a.");
             return true;
         }
 
@@ -1650,11 +1650,12 @@ public final class GuildCommand implements TabExecutor {
         }
 
         // -------------------------
+                // -------------------------
         // REGISTER / UNREGISTER
         // -------------------------
         if (sub.equals("register")) {
 
-            // Admin-only. (Console always allowed if you want it; remove the ConsoleCommandSender part if not.)
+            // Admin-only. Intended for Citizens NPC (console) and admin players.
             if (!(sender instanceof org.bukkit.command.ConsoleCommandSender) && !sender.hasPermission("magicera.admin")) {
                 sender.sendMessage("§7[§aGuild§7] §cNo permission.");
                 return true;
@@ -1667,7 +1668,13 @@ public final class GuildCommand implements TabExecutor {
 
             String input = args[1];
             OfflinePlayer target = Bukkit.getOfflinePlayer(input);
+            logRegistrationDebug("resolve", "input=" + input
+                    + " uuid=" + (target == null ? "null" : target.getUniqueId())
+                    + " name=" + (target == null ? "null" : target.getName())
+                    + " hasPlayedBefore=" + (target != null && target.hasPlayedBefore())
+                    + " isOnline=" + (target != null && target.isOnline()));
             if (target == null || (target.getName() == null && !target.hasPlayedBefore())) {
+                logRegistrationDebug("target-not-found", "input=" + input);
                 sender.sendMessage(registrationSenderMessage("playerNotFound").replace("%player%", input));
                 return true;
             }
@@ -1678,6 +1685,7 @@ public final class GuildCommand implements TabExecutor {
             // Already in a guild → do NOT charge or register
             if (targetPd.getGuildId() != null) {
                 sendRegistrationTargetMessage(target, "registerAlreadyInGuild");
+                logRegistrationDebug("already-in-guild", "target=" + targetName + " guildId=" + targetPd.getGuildId());
                 sender.sendMessage("§7[§aGuild§7] §e" + targetName + " is already in a guild. Registration not applied.");
                 return true;
             }
@@ -1685,40 +1693,38 @@ public final class GuildCommand implements TabExecutor {
             // Already registered → do not charge again
             if (targetPd.canCreateGuild()) {
                 sendRegistrationTargetMessage(target, "registerSuccess");
+                logRegistrationDebug("already-registered", "target=" + targetName);
                 sender.sendMessage("§7[§aGuild§7] §e" + targetName + " is already registered.");
                 return true;
             }
 
             Economy econ = (plugin.economy() == null) ? null : plugin.economy().econ();
             if (econ == null) {
+                logRegistrationDebug("vault-missing", "target=" + targetName);
                 sender.sendMessage(registrationSenderMessage("vaultMissing"));
                 return true;
             }
 
             double amount = Math.max(0.0, plugin.getConfig().getDouble("guildRegistration.cost", 0.0));
+            logRegistrationDebug("economy-check", "provider=" + econ.getName() + " target=" + targetName + " cost=" + fmt(amount));
 
-            // IMPORTANT: balance check matches how your guild tax/bank code reads balances
-            double balance;
-            try {
-                balance = econ.getBalance(target);
-            } catch (Throwable t) {
-                balance = (target.getName() == null) ? 0.0 : econ.getBalance(target.getName());
-            }
+            ensureEconomyAccountExists(econ, target);
+            double balance = readEconomyBalance(econ, target);
+            logRegistrationDebug("balance", "target=" + targetName + " balance=" + fmt(balance));
 
             if (balance < amount) {
                 sendRegistrationTargetMessage(target, "registerInsufficientFunds");
+                logRegistrationDebug("insufficient-funds", "target=" + targetName + " balance=" + fmt(balance) + " required=" + fmt(amount));
                 sender.sendMessage("§7[§aGuild§7] §e" + targetName + " has insufficient funds.");
                 return true;
             }
 
-            EconomyResponse r;
-            try {
-                r = econ.withdrawPlayer(target, amount);
-            } catch (Throwable t) {
-                r = (target.getName() == null)
-                        ? new EconomyResponse(0.0, balance, EconomyResponse.ResponseType.FAILURE, "player has no name")
-                        : econ.withdrawPlayer(target.getName(), amount);
-            }
+            EconomyResponse r = withdrawEconomy(econ, target, amount, balance);
+            logRegistrationDebug("withdraw", "target=" + targetName
+                    + " success=" + r.transactionSuccess()
+                    + " amount=" + fmt(r.amount)
+                    + " balanceAfter=" + fmt(r.balance)
+                    + " error=" + (r.errorMessage == null ? "" : r.errorMessage));
 
             if (!r.transactionSuccess()) {
                 sender.sendMessage("§7[§aGuild§7] §cRegistration charge failed: "
@@ -1726,10 +1732,13 @@ public final class GuildCommand implements TabExecutor {
                 return true;
             }
 
+            logRegistrationDebug("playerdata-before", "target=" + targetName + " canCreateGuild=" + targetPd.canCreateGuild());
             targetPd.setCanCreateGuild(true);
             plugin.storage().save();
+            logRegistrationDebug("playerdata-after", "target=" + targetName + " canCreateGuild=" + targetPd.canCreateGuild());
 
             sendRegistrationTargetMessage(target, "registerSuccess");
+            logRegistrationDebug("register-success", "target=" + targetName + " charged=" + fmt(amount));
             sender.sendMessage("§7[§aGuild§7] §aRegistered §f" + targetName + "§a. Charged §f$" + fmt(amount) + "§a.");
             return true;
         }
@@ -1762,8 +1771,7 @@ public final class GuildCommand implements TabExecutor {
             return true;
         }
 
-        // -------------------------
-        // FORCE TAX (admin)
+// FORCE TAX (admin)
         // -------------------------
         if (sub.equals("forcetax")) {
             if (!sender.hasPermission("magicera.admin")) {
@@ -2173,13 +2181,19 @@ private void sendGuildInfo(Player viewer, Guild g) {
     }
 
     private String registrationSenderMessage(String key) {
-        return Text.color(plugin.getConfig().getString("guildRegistration.messages." + key,
+        String message = Text.color(plugin.getConfig().getString("guildRegistration.messages." + key,
                 "&7[&aGuild&7] &cAction failed."));
+        logRegistrationDebug("message-sender", "key=" + key + " text=" + message);
+        return message;
     }
 
     private void sendRegistrationTargetMessage(OfflinePlayer target, String key) {
         String message = Text.color(plugin.getConfig().getString("guildRegistration.messages." + key, ""));
-        if (message == null || message.isBlank()) return;
+        logRegistrationDebug("message-target", "key=" + key
+                + " targetUuid=" + (target == null ? "null" : target.getUniqueId())
+                + " targetOnline=" + (target != null && target.isOnline())
+                + " text=" + message);
+        if (message == null || message.isBlank() || target == null) return;
 
         Player online = target.getPlayer();
         if (online != null) {
@@ -2187,7 +2201,63 @@ private void sendGuildInfo(Player viewer, Guild g) {
         }
     }
 
-    private String formatGuildList(Set<String> ids) {
+    private void ensureEconomyAccountExists(Economy econ, OfflinePlayer target) {
+        if (econ == null || target == null) return;
+        try {
+            boolean hasAccount = econ.hasAccount(target);
+            if (!hasAccount) {
+                econ.createPlayerAccount(target);
+            }
+            logRegistrationDebug("account", "uuid=" + target.getUniqueId() + " hasAccount=" + hasAccount);
+        } catch (Throwable t) {
+            logRegistrationDebug("account", "uuid=" + target.getUniqueId() + " hasAccount=error: " + t.getClass().getSimpleName());
+        }
+    }
+
+    private double readEconomyBalance(Economy econ, OfflinePlayer target) {
+        if (econ == null || target == null) return 0.0;
+        try {
+            return econ.getBalance(target);
+        } catch (Throwable t) {
+            logRegistrationDebug("balance-offline-fallback", "uuid=" + target.getUniqueId() + " reason=" + t.getClass().getSimpleName());
+            String name = target.getName();
+            if (name != null) {
+                try {
+                    return econ.getBalance(name);
+                } catch (Throwable ignored) {
+                    logRegistrationDebug("balance-name-fallback", "name=" + name + " failed");
+                }
+            }
+            return 0.0;
+        }
+    }
+
+    private EconomyResponse withdrawEconomy(Economy econ, OfflinePlayer target, double amount, double preBalance) {
+        if (econ == null || target == null) {
+            return new EconomyResponse(0.0, preBalance, EconomyResponse.ResponseType.FAILURE, "economy/target missing");
+        }
+        try {
+            return econ.withdrawPlayer(target, amount);
+        } catch (Throwable t) {
+            logRegistrationDebug("withdraw-offline-fallback", "uuid=" + target.getUniqueId() + " reason=" + t.getClass().getSimpleName());
+            String name = target.getName();
+            if (name != null) {
+                try {
+                    return econ.withdrawPlayer(name, amount);
+                } catch (Throwable ignored) {
+                    logRegistrationDebug("withdraw-name-fallback", "name=" + name + " failed");
+                }
+            }
+            return new EconomyResponse(0.0, preBalance, EconomyResponse.ResponseType.FAILURE, "failed to withdraw for offline player");
+        }
+    }
+
+    private void logRegistrationDebug(String stage, String message) {
+        if (!plugin.getConfig().getBoolean("guildRegistration.debug", false)) return;
+        plugin.getLogger().info("[GuildRegistrationDebug] stage=" + stage + " " + message);
+    }
+
+private String formatGuildList(Set<String> ids) {
         if (ids == null || ids.isEmpty()) return "None";
         List<String> names = new ArrayList<>();
         for (String id : ids) {
@@ -2599,7 +2669,7 @@ private void sendGuildInfo(Player viewer, Guild g) {
     }
 
     private void announceAllyWarEntry(Guild entrant, Guild sideLeader) {
-        Bukkit.broadcastMessage("§7[§aMagic Era§7] "
+        Bukkit.broadcastMessage("§7[§bMagic Era§7] "
                 + Text.color(entrant.getName())
                 + " §fhas joined the war on the side of "
                 + Text.color(sideLeader.getName())
