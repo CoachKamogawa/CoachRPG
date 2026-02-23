@@ -12,6 +12,7 @@ import org.bukkit.plugin.java.JavaPlugin;
 import java.io.File;
 import java.io.IOException;
 import java.util.*;
+import java.util.concurrent.locks.ReentrantLock;
 
 public final class Storage {
 
@@ -24,6 +25,9 @@ public final class Storage {
 
     private final Map<String, Guild> guildsById = new HashMap<>();
     private final Map<UUID, PlayerData> playersById = new HashMap<>();
+
+    // Single-writer guard for file IO (prevents overlapping saves from multiple call sites).
+    private final ReentrantLock saveLock = new ReentrantLock();
 
     public Storage(JavaPlugin plugin) {
         this.plugin = plugin;
@@ -258,174 +262,184 @@ public final class Storage {
     }
 
     public void save() {
-        if (guildsYaml == null) guildsYaml = new YamlConfiguration();
-        if (playersYaml == null) playersYaml = new YamlConfiguration();
-
-        guildsYaml.set("guilds", null);
-        playersYaml.set("players", null);
-
-        // Save guilds
-        for (Guild g : guildsById.values()) {
-            String base = "guilds." + g.getId();
-            guildsYaml.set(base + ".name", g.getName());
-            guildsYaml.set(base + ".prefix", g.getPrefix());
-            guildsYaml.set(base + ".title", g.getTitle());
-
-            // description + founded timestamp
-            guildsYaml.set(base + ".description", g.getDescription());
-            guildsYaml.set(base + ".foundedAtEpochMs", g.getFoundedAtEpochMs());
-
-            guildsYaml.set(base + ".alignment", g.getAlignment().name());
-
-            // Bank + tax + officer withdraw window tracking
-            guildsYaml.set(base + ".bankBalance", g.getBankBalance());
-            guildsYaml.set(base + ".taxPercent", g.getTaxPercent());
-            guildsYaml.set(base + ".officerWithdrawUsed24h", g.getOfficerWithdrawUsed24h());
-            guildsYaml.set(base + ".officerWithdrawWindowStartMs", g.getOfficerWithdrawWindowStartMs());
-
-            // Favor / impeachment / log fields
-            guildsYaml.set(base + ".masterOutOfFavorSinceEpochMs",
-                    g.getMasterOutOfFavorSinceEpochMs() == null ? 0L : g.getMasterOutOfFavorSinceEpochMs());
-
-            guildsYaml.set(base + ".masterOutOfFavorWarnEpochMs",
-                    g.getMasterOutOfFavorWarnEpochMs() == null ? 0L : g.getMasterOutOfFavorWarnEpochMs());
-
-            guildsYaml.set(base + ".impeachmentStartedEpochMs",
-                    g.getImpeachmentStartedEpochMs() == null ? 0L : g.getImpeachmentStartedEpochMs());
-            guildsYaml.set(base + ".kickLockUntilEpochMs", g.getKickLockUntilEpochMs());
-            guildsYaml.set(base + ".logEntries", g.getLogEntries());
-
-            guildsYaml.set(base + ".home.world", g.getHomeWorld());
-            guildsYaml.set(base + ".home.x", g.getHomeX());
-            guildsYaml.set(base + ".home.y", g.getHomeY());
-            guildsYaml.set(base + ".home.z", g.getHomeZ());
-
-            guildsYaml.set(base + ".membersCanClaim", g.isMembersCanClaim());
-            guildsYaml.set(base + ".friendlyFireEnabled", g.isFriendlyFireEnabled());
-            guildsYaml.set(base + ".allyFireEnabled", g.isAllyFireEnabled());
-
-            guildsYaml.set(base + ".inWar", g.isInWar());
-            guildsYaml.set(base + ".warEndsAtEpochMs", g.getWarEndsAtEpochMs() == null ? 0L : g.getWarEndsAtEpochMs());
-            guildsYaml.set(base + ".warSessionId", g.getWarSessionId() == null ? 0L : g.getWarSessionId());
-
-            guildsYaml.set(base + ".claimedChunks", new ArrayList<>(g.getClaimedChunks()));
-
-            String claimTsBase = base + ".claimTimestamps";
-            guildsYaml.set(claimTsBase, null);
-            for (Map.Entry<String, Long> e : g.getClaimTimestamps().entrySet()) {
-                guildsYaml.set(claimTsBase + "." + e.getKey().replace(".", "%2E"), e.getValue());
-            }
-
-            guildsYaml.set(base + ".unstableClaims", new ArrayList<>(g.getUnstableClaims()));
-            guildsYaml.set(base + ".overclaimedChunks", new ArrayList<>(g.getOverclaimedChunks()));
-
-            String overclaimWarSessionIdsBase = base + ".overclaimWarSessionIds";
-            guildsYaml.set(overclaimWarSessionIdsBase, null);
-            for (Map.Entry<String, Long> e : g.getOverclaimWarSessionIds().entrySet()) {
-                guildsYaml.set(overclaimWarSessionIdsBase + "." + e.getKey().replace(".", "%2E"), e.getValue());
-            }
-
-            String overclaimTimesBase = base + ".overclaimTimes";
-            guildsYaml.set(overclaimTimesBase, null);
-            for (Map.Entry<String, Long> e : g.getOverclaimTimes().entrySet()) {
-                guildsYaml.set(overclaimTimesBase + "." + e.getKey().replace(".", "%2E"), e.getValue());
-            }
-
-            String overclaimedFromGuildIdsBase = base + ".overclaimedFromGuildIds";
-            guildsYaml.set(overclaimedFromGuildIdsBase, null);
-            for (Map.Entry<String, String> e : g.getOverclaimedFromGuildIds().entrySet()) {
-                guildsYaml.set(overclaimedFromGuildIdsBase + "." + e.getKey().replace(".", "%2E"), e.getValue());
-            }
-
-            guildsYaml.set(base + ".hall.world", g.getHallWorld());
-            guildsYaml.set(base + ".hall.centerX", g.getHallCenterX());
-            guildsYaml.set(base + ".hall.centerZ", g.getHallCenterZ());
-            guildsYaml.set(base + ".hall.hasHall", g.hasHall());
-            guildsYaml.set(base + ".hall.lastMovedAtEpochMs", g.getHallLastMovedAtEpochMs() == null ? 0L : g.getHallLastMovedAtEpochMs());
-            guildsYaml.set(base + ".hall.chunks", new ArrayList<>(g.getHallChunks()));
-
-            guildsYaml.set(base + ".allies", new ArrayList<>(g.getAllies()));
-            guildsYaml.set(base + ".enemies", new ArrayList<>(g.getEnemies()));
-            guildsYaml.set(base + ".pendingAllyRequests", new ArrayList<>(g.getPendingAllyRequests()));
-            guildsYaml.set(base + ".pendingWarRequests", new ArrayList<>(g.getPendingWarRequests()));
-
-            // pending truce requests
-            guildsYaml.set(base + ".pendingTruceRequests", new ArrayList<>(g.getPendingTruceRequests()));
-
-            // ally/war request cooldowns
-            String allyCooldownBase = base + ".allyRequestCooldowns";
-            guildsYaml.set(allyCooldownBase, null);
-            for (Map.Entry<String, Long> e : g.getAllyRequestCooldowns().entrySet()) {
-                guildsYaml.set(allyCooldownBase + "." + e.getKey(), e.getValue());
-            }
-
-            String warCooldownBase = base + ".warRequestCooldowns";
-            guildsYaml.set(warCooldownBase, null);
-            for (Map.Entry<String, Long> e : g.getWarRequestCooldowns().entrySet()) {
-                guildsYaml.set(warCooldownBase + "." + e.getKey(), e.getValue());
-            }
-
-            String warningLastSentBase = base + ".warningLastSent";
-            guildsYaml.set(warningLastSentBase, null);
-            for (Map.Entry<String, Long> e : g.getWarningLastSent().entrySet()) {
-                guildsYaml.set(warningLastSentBase + "." + e.getKey(), e.getValue());
-            }
-            guildsYaml.set(base + ".warningSentWarSession", new ArrayList<>(g.getWarningSentWarSession()));
-
-            String memBase = base + ".members";
-            guildsYaml.set(memBase, null);
-            for (Map.Entry<UUID, GuildRole> e : g.getMembers().entrySet()) {
-                guildsYaml.set(memBase + "." + e.getKey(), e.getValue().name());
-            }
-
-            String joinedBase = base + ".memberJoinedAt";
-            guildsYaml.set(joinedBase, null);
-            for (Map.Entry<UUID, Long> e : g.getMemberJoinedAt().entrySet()) {
-                guildsYaml.set(joinedBase + "." + e.getKey(), e.getValue());
-            }
-
-            String votesBase = base + ".impeachmentVotes";
-            guildsYaml.set(votesBase, null);
-            for (Map.Entry<UUID, Boolean> e : g.getImpeachmentVotes().entrySet()) {
-                guildsYaml.set(votesBase + "." + e.getKey(), e.getValue());
-            }
-        }
-
-        // Save players
-        for (PlayerData p : playersById.values()) {
-            String base = "players." + p.getUuid();
-            playersYaml.set(base + ".guildId", p.getGuildId());
-            playersYaml.set(base + ".alignmentScore", p.getAlignmentScore());
-
-            Long since = p.getOutOfAlignmentSinceEpochMs();
-            playersYaml.set(base + ".outOfAlignmentSinceEpochMs", since == null ? 0L : since);
-
-            Long lastWarn = p.getLastOutOfAlignmentWarnEpochMs();
-            playersYaml.set(base + ".lastOutOfAlignmentWarnEpochMs", lastWarn == null ? 0L : lastWarn);
-
-            playersYaml.set(base + ".guildTitle", p.getGuildTitle());
-            playersYaml.set(base + ".lastSeenEpochMs", p.getLastSeenEpochMs());
-            playersYaml.set(base + ".guildChatEnabled", p.isGuildChatEnabled());
-            playersYaml.set(base + ".canCreateGuild", p.canCreateGuild());
-            playersYaml.set(base + ".power", p.getPower());
-
-            // offline tax notice accumulator
-            playersYaml.set(base + ".pendingTaxNoticeAmount", p.getPendingTaxNoticeAmount());
-
-            // pending guild messages
-            playersYaml.set(base + ".pendingGuildMessages", new ArrayList<>(p.getPendingGuildMessages()));
+        if (!saveLock.tryLock()) {
+            // Another save is already running; skip this cycle.
+            return;
         }
 
         try {
-            guildsYaml.save(guildsFile);
-        } catch (IOException e) {
-            plugin.getLogger().warning("Failed to save guilds.yml: " + e.getMessage());
-        }
+            if (guildsYaml == null) guildsYaml = new YamlConfiguration();
+            if (playersYaml == null) playersYaml = new YamlConfiguration();
 
-        try {
-            playersYaml.save(playersFile);
-        } catch (IOException e) {
-            plugin.getLogger().warning("Failed to save players.yml: " + e.getMessage());
+            guildsYaml.set("guilds", null);
+            playersYaml.set("players", null);
+
+            // Save guilds
+            for (Guild g : guildsById.values()) {
+                String base = "guilds." + g.getId();
+                guildsYaml.set(base + ".name", g.getName());
+                guildsYaml.set(base + ".prefix", g.getPrefix());
+                guildsYaml.set(base + ".title", g.getTitle());
+
+                // description + founded timestamp
+                guildsYaml.set(base + ".description", g.getDescription());
+                guildsYaml.set(base + ".foundedAtEpochMs", g.getFoundedAtEpochMs());
+
+                guildsYaml.set(base + ".alignment", g.getAlignment().name());
+
+                // Bank + tax + officer withdraw window tracking
+                guildsYaml.set(base + ".bankBalance", g.getBankBalance());
+                guildsYaml.set(base + ".taxPercent", g.getTaxPercent());
+                guildsYaml.set(base + ".officerWithdrawUsed24h", g.getOfficerWithdrawUsed24h());
+                guildsYaml.set(base + ".officerWithdrawWindowStartMs", g.getOfficerWithdrawWindowStartMs());
+
+                // Favor / impeachment / log fields
+                guildsYaml.set(base + ".masterOutOfFavorSinceEpochMs",
+                        g.getMasterOutOfFavorSinceEpochMs() == null ? 0L : g.getMasterOutOfFavorSinceEpochMs());
+
+                guildsYaml.set(base + ".masterOutOfFavorWarnEpochMs",
+                        g.getMasterOutOfFavorWarnEpochMs() == null ? 0L : g.getMasterOutOfFavorWarnEpochMs());
+
+                guildsYaml.set(base + ".impeachmentStartedEpochMs",
+                        g.getImpeachmentStartedEpochMs() == null ? 0L : g.getImpeachmentStartedEpochMs());
+                guildsYaml.set(base + ".kickLockUntilEpochMs", g.getKickLockUntilEpochMs());
+                guildsYaml.set(base + ".logEntries", g.getLogEntries());
+
+                guildsYaml.set(base + ".home.world", g.getHomeWorld());
+                guildsYaml.set(base + ".home.x", g.getHomeX());
+                guildsYaml.set(base + ".home.y", g.getHomeY());
+                guildsYaml.set(base + ".home.z", g.getHomeZ());
+
+                guildsYaml.set(base + ".membersCanClaim", g.isMembersCanClaim());
+                guildsYaml.set(base + ".friendlyFireEnabled", g.isFriendlyFireEnabled());
+                guildsYaml.set(base + ".allyFireEnabled", g.isAllyFireEnabled());
+
+                guildsYaml.set(base + ".inWar", g.isInWar());
+                guildsYaml.set(base + ".warEndsAtEpochMs", g.getWarEndsAtEpochMs() == null ? 0L : g.getWarEndsAtEpochMs());
+                guildsYaml.set(base + ".warSessionId", g.getWarSessionId() == null ? 0L : g.getWarSessionId());
+
+                guildsYaml.set(base + ".claimedChunks", new ArrayList<>(g.getClaimedChunks()));
+
+                String claimTsBase = base + ".claimTimestamps";
+                guildsYaml.set(claimTsBase, null);
+                for (Map.Entry<String, Long> e : g.getClaimTimestamps().entrySet()) {
+                    guildsYaml.set(claimTsBase + "." + e.getKey().replace(".", "%2E"), e.getValue());
+                }
+
+                guildsYaml.set(base + ".unstableClaims", new ArrayList<>(g.getUnstableClaims()));
+                guildsYaml.set(base + ".overclaimedChunks", new ArrayList<>(g.getOverclaimedChunks()));
+
+                String overclaimWarSessionIdsBase = base + ".overclaimWarSessionIds";
+                guildsYaml.set(overclaimWarSessionIdsBase, null);
+                for (Map.Entry<String, Long> e : g.getOverclaimWarSessionIds().entrySet()) {
+                    guildsYaml.set(overclaimWarSessionIdsBase + "." + e.getKey().replace(".", "%2E"), e.getValue());
+                }
+
+                String overclaimTimesBase = base + ".overclaimTimes";
+                guildsYaml.set(overclaimTimesBase, null);
+                for (Map.Entry<String, Long> e : g.getOverclaimTimes().entrySet()) {
+                    guildsYaml.set(overclaimTimesBase + "." + e.getKey().replace(".", "%2E"), e.getValue());
+                }
+
+                String overclaimedFromGuildIdsBase = base + ".overclaimedFromGuildIds";
+                guildsYaml.set(overclaimedFromGuildIdsBase, null);
+                for (Map.Entry<String, String> e : g.getOverclaimedFromGuildIds().entrySet()) {
+                    guildsYaml.set(overclaimedFromGuildIdsBase + "." + e.getKey().replace(".", "%2E"), e.getValue());
+                }
+
+                guildsYaml.set(base + ".hall.world", g.getHallWorld());
+                guildsYaml.set(base + ".hall.centerX", g.getHallCenterX());
+                guildsYaml.set(base + ".hall.centerZ", g.getHallCenterZ());
+                guildsYaml.set(base + ".hall.hasHall", g.hasHall());
+                guildsYaml.set(base + ".hall.lastMovedAtEpochMs", g.getHallLastMovedAtEpochMs() == null ? 0L : g.getHallLastMovedAtEpochMs());
+                guildsYaml.set(base + ".hall.chunks", new ArrayList<>(g.getHallChunks()));
+
+                guildsYaml.set(base + ".allies", new ArrayList<>(g.getAllies()));
+                guildsYaml.set(base + ".enemies", new ArrayList<>(g.getEnemies()));
+                guildsYaml.set(base + ".pendingAllyRequests", new ArrayList<>(g.getPendingAllyRequests()));
+                guildsYaml.set(base + ".pendingWarRequests", new ArrayList<>(g.getPendingWarRequests()));
+
+                // pending truce requests
+                guildsYaml.set(base + ".pendingTruceRequests", new ArrayList<>(g.getPendingTruceRequests()));
+
+                // ally/war request cooldowns
+                String allyCooldownBase = base + ".allyRequestCooldowns";
+                guildsYaml.set(allyCooldownBase, null);
+                for (Map.Entry<String, Long> e : g.getAllyRequestCooldowns().entrySet()) {
+                    guildsYaml.set(allyCooldownBase + "." + e.getKey(), e.getValue());
+                }
+
+                String warCooldownBase = base + ".warRequestCooldowns";
+                guildsYaml.set(warCooldownBase, null);
+                for (Map.Entry<String, Long> e : g.getWarRequestCooldowns().entrySet()) {
+                    guildsYaml.set(warCooldownBase + "." + e.getKey(), e.getValue());
+                }
+
+                String warningLastSentBase = base + ".warningLastSent";
+                guildsYaml.set(warningLastSentBase, null);
+                for (Map.Entry<String, Long> e : g.getWarningLastSent().entrySet()) {
+                    guildsYaml.set(warningLastSentBase + "." + e.getKey(), e.getValue());
+                }
+                guildsYaml.set(base + ".warningSentWarSession", new ArrayList<>(g.getWarningSentWarSession()));
+
+                String memBase = base + ".members";
+                guildsYaml.set(memBase, null);
+                for (Map.Entry<UUID, GuildRole> e : g.getMembers().entrySet()) {
+                    guildsYaml.set(memBase + "." + e.getKey(), e.getValue().name());
+                }
+
+                String joinedBase = base + ".memberJoinedAt";
+                guildsYaml.set(joinedBase, null);
+                for (Map.Entry<UUID, Long> e : g.getMemberJoinedAt().entrySet()) {
+                    guildsYaml.set(joinedBase + "." + e.getKey(), e.getValue());
+                }
+
+                String votesBase = base + ".impeachmentVotes";
+                guildsYaml.set(votesBase, null);
+                for (Map.Entry<UUID, Boolean> e : g.getImpeachmentVotes().entrySet()) {
+                    guildsYaml.set(votesBase + "." + e.getKey(), e.getValue());
+                }
+            }
+
+            // Save players
+            for (PlayerData p : playersById.values()) {
+                String base = "players." + p.getUuid();
+                playersYaml.set(base + ".guildId", p.getGuildId());
+                playersYaml.set(base + ".alignmentScore", p.getAlignmentScore());
+
+                Long since = p.getOutOfAlignmentSinceEpochMs();
+                playersYaml.set(base + ".outOfAlignmentSinceEpochMs", since == null ? 0L : since);
+
+                Long lastWarn = p.getLastOutOfAlignmentWarnEpochMs();
+                playersYaml.set(base + ".lastOutOfAlignmentWarnEpochMs", lastWarn == null ? 0L : lastWarn);
+
+                playersYaml.set(base + ".guildTitle", p.getGuildTitle());
+                playersYaml.set(base + ".lastSeenEpochMs", p.getLastSeenEpochMs());
+                playersYaml.set(base + ".guildChatEnabled", p.isGuildChatEnabled());
+                playersYaml.set(base + ".canCreateGuild", p.canCreateGuild());
+                playersYaml.set(base + ".power", p.getPower());
+
+                // offline tax notice accumulator
+                playersYaml.set(base + ".pendingTaxNoticeAmount", p.getPendingTaxNoticeAmount());
+
+                // pending guild messages
+                playersYaml.set(base + ".pendingGuildMessages", new ArrayList<>(p.getPendingGuildMessages()));
+            }
+
+            try {
+                guildsYaml.save(guildsFile);
+            } catch (IOException e) {
+                plugin.getLogger().warning("Failed to save guilds.yml: " + e.getMessage());
+            }
+
+            try {
+                playersYaml.save(playersFile);
+            } catch (IOException e) {
+                plugin.getLogger().warning("Failed to save players.yml: " + e.getMessage());
+            }
+
+        } finally {
+            saveLock.unlock();
         }
     }
 
