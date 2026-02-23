@@ -2603,11 +2603,17 @@ public final class GuildCommand implements TabExecutor {
 
     private String formatDuration(long millis) {
         long totalSeconds = Math.max(1L, millis / 1000L);
-        long minutes = totalSeconds / 60L;
+        long hours = totalSeconds / 3600L;
+        long minutes = (totalSeconds % 3600L) / 60L;
         long seconds = totalSeconds % 60L;
-        if (minutes <= 0L) return seconds + "s";
-        if (seconds == 0L) return minutes + "m";
-        return minutes + "m " + seconds + "s";
+
+        if (hours > 0) {
+            return minutes > 0 ? hours + "h " + minutes + "m" : hours + "h";
+        }
+        if (minutes > 0) {
+            return seconds > 0 ? minutes + "m " + seconds + "s" : minutes + "m";
+        }
+        return seconds + "s";
     }
 
     private static final class ParsedCreate {
