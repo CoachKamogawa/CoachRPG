@@ -2270,6 +2270,13 @@ public final class GuildCommand implements TabExecutor {
                 sender.sendMessage("§7[§aGuild§7] §cNo pending truce request from that guild.");
                 return true;
             }
+
+            long remaining = truceCooldownRemainingMs(actor);
+            if (remaining > 0L) {
+                sender.sendMessage("§7[§aGuild§7] §cYou must wait §e" + formatDuration(remaining) + " §cbefore accepting a truce.");
+                return true;
+            }
+
             if (hasCoalitionWarConflict(requester, actor)) {
                 sender.sendMessage("§7[§aGuild§7] §cYou cannot sign this truce while allied guilds remain in active conflict.");
                 return true;
@@ -2300,6 +2307,13 @@ public final class GuildCommand implements TabExecutor {
             sender.sendMessage("§7[§aGuild§7] §cYour guild is not at war with that guild.");
             return true;
         }
+
+        long remaining = truceCooldownRemainingMs(actor);
+        if (remaining > 0L) {
+            sender.sendMessage("§7[§aGuild§7] §cYou must wait §e" + formatDuration(remaining) + " §cbefore requesting a truce.");
+            return true;
+        }
+
         if (hasCoalitionWarConflict(actor, target)) {
             sender.sendMessage("§7[§aGuild§7] §cYou cannot request a truce while allied guilds remain in active conflict.");
             return true;
@@ -2568,6 +2582,23 @@ public final class GuildCommand implements TabExecutor {
 
         PlayerData masterData = plugin.storage().getOrCreatePlayer(masterId);
         masterData.getPendingGuildMessages().add(message);
+    }
+
+    private long truceCooldownRemainingMs(Guild actor) {
+        if (actor == null) return 0L;
+
+        Long warEnd = actor.getWarEndsAtEpochMs();
+        if (warEnd == null) return 0L;
+
+        long now = System.currentTimeMillis();
+
+        long warDurationMs = 24L * 60L * 60L * 1000L;
+        long minWarBeforeTruceMs = 12L * 60L * 60L * 1000L;
+
+        long warStart = warEnd - warDurationMs;
+        long allowedAt = warStart + minWarBeforeTruceMs;
+
+        return Math.max(0L, allowedAt - now);
     }
 
     private String formatDuration(long millis) {
