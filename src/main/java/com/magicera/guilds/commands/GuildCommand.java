@@ -1979,65 +1979,70 @@ public final class GuildCommand implements TabExecutor {
         }
     }
 
-    private void sendGuildInfo(Player viewer, Guild g) {
-        viewer.sendMessage("§8§m--------------------------------");
-        viewer.sendMessage("§7[§aGuild Info§7] §r" + Text.color(g.getName()));
-        viewer.sendMessage("§7Description: §f" + (g.getDescription().isEmpty() ? "None" : g.getDescription()));
-        viewer.sendMessage("§7Founded: §f" + new java.text.SimpleDateFormat("yyyy-MM-dd").format(new java.util.Date(g.getFoundedAtEpochMs())));
+private void sendGuildInfo(Player viewer, Guild g) {
+    viewer.sendMessage("§8§m--------------------------------");
+    viewer.sendMessage("§7[§aGuild Info§7] §r" + Text.color(g.getName()));
+    viewer.sendMessage("§7Description: §f" + (g.getDescription().isEmpty() ? "None" : g.getDescription()));
+    viewer.sendMessage("§7Founded: §f" + new java.text.SimpleDateFormat("yyyy-MM-dd").format(new java.util.Date(g.getFoundedAtEpochMs())));
 
-        Map<GuildRole, List<String>> byRole = new EnumMap<>(GuildRole.class);
-        for (GuildRole r : GuildRole.values()) byRole.put(r, new ArrayList<>());
-        for (Map.Entry<UUID, GuildRole> e : g.getMembers().entrySet()) {
-            byRole.get(e.getValue()).add(safeName(e.getKey()));
-        }
-        for (GuildRole r : GuildRole.values()) {
-            List<String> names = byRole.get(r);
-            if (names.isEmpty()) continue;
-            viewer.sendMessage("§7" + r.name() + ": §f" + String.join(", ", names));
-        }
-
-        double power = plugin.guildPower().guildPower(g);
-        int maxPower = plugin.guildPower().maxGuildPower(g);
-
-        int totalClaims = g.getClaimedChunks().size();
-        int hallUsed = g.hasHall() ? g.getHallChunks().size() : 0;
-        int hallMax = 9;
-        int expansionUsed = Math.max(0, totalClaims - hallUsed);
-
-        var allowedClaims = plugin.guildPower().getAllowedClaimsBreakdown(g);
-        int maxClaims = allowedClaims.maxClaims();
-        int supportedClaimsRaw = allowedClaims.supportedClaimsRaw();
-        int expansionCap = Math.max(0, Math.min(maxClaims, supportedClaimsRaw) - hallMax);
-
-        plugin.getLogger().info("[GUILD-INFO DEBUG] guild=" + g.getId()
-                + " memberCount=" + allowedClaims.memberCount()
-                + " maxClaims=" + allowedClaims.maxClaims()
-                + " currentGuildPower=" + fmt(allowedClaims.currentGuildPower())
-                + " supportedClaims=" + allowedClaims.supportedClaims()
-                + " formulaBranch=" + allowedClaims.formulaBranch());
-
-        String hallStatus = "None";
-        if (g.hasHall()) {
-            int atRisk = plugin.guildPower().hallAtRiskThreshold(g);
-            int vulnerable = plugin.guildPower().hallVulnerableThreshold(g);
-            if (power <= vulnerable) {
-                hallStatus = "Vulnerable";
-            } else if (power <= atRisk) hallStatus = "At Risk";
-            else hallStatus = "Protected";
-        }
-
-        viewer.sendMessage("§7Bank: §f$" + fmt(g.getBankBalance()));
-        viewer.sendMessage("§7Tax: §f" + g.getTaxPercent() + "%");
-        viewer.sendMessage("§7Next tax: §f" + new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm").format(new java.util.Date(plugin.nextGuildTaxEpochMs())));
-        viewer.sendMessage("§7Allies: §f" + formatGuildList(g.getAllies()));
-        viewer.sendMessage("§7Enemies: §f" + formatGuildList(g.getEnemies()));
-        viewer.sendMessage("§7Guild Hall: §f" + hallUsed + "§7/§f" + hallMax);
-        viewer.sendMessage("§7Expansion Claims: §f" + expansionUsed + "§7/§f" + expansionCap
-                + (expansionUsed > expansionCap ? " §c(UNSTABLE)" : ""));
-        viewer.sendMessage("§7Hall Status: §f" + hallStatus);
-        viewer.sendMessage("§7Guild Power: §f" + fmt(power) + "§7/§f" + maxPower);
-        viewer.sendMessage("§8§m--------------------------------");
+    Map<GuildRole, List<String>> byRole = new EnumMap<>(GuildRole.class);
+    for (GuildRole r : GuildRole.values()) byRole.put(r, new ArrayList<>());
+    for (Map.Entry<UUID, GuildRole> e : g.getMembers().entrySet()) {
+        byRole.get(e.getValue()).add(safeName(e.getKey()));
     }
+    for (GuildRole r : GuildRole.values()) {
+        List<String> names = byRole.get(r);
+        if (names.isEmpty()) continue;
+        viewer.sendMessage("§7" + r.name() + ": §f" + String.join(", ", names));
+    }
+
+    double power = plugin.guildPower().guildPower(g);
+    int maxPower = plugin.guildPower().maxGuildPower(g);
+
+    int totalClaims = g.getClaimedChunks().size();
+    int hallUsed = g.hasHall() ? g.getHallChunks().size() : 0;
+    int hallMax = 9;
+    int expansionUsed = Math.max(0, totalClaims - hallUsed);
+
+    var allowedClaims = plugin.guildPower().getAllowedClaimsBreakdown(g);
+    int maxClaims = allowedClaims.maxClaims();
+    int supportedClaimsRaw = allowedClaims.supportedClaimsRaw();
+    int expansionCap = Math.max(0, Math.min(maxClaims, supportedClaimsRaw) - hallMax);
+
+    plugin.getLogger().info("[GUILD-INFO DEBUG] guild=" + g.getId()
+            + " memberCount=" + allowedClaims.memberCount()
+            + " maxClaims=" + allowedClaims.maxClaims()
+            + " currentGuildPower=" + fmt(allowedClaims.currentGuildPower())
+            + " supportedClaims=" + allowedClaims.supportedClaims()
+            + " formulaBranch=" + allowedClaims.formulaBranch());
+
+    String hallStatus = "None";
+    if (g.hasHall()) {
+        int atRisk = plugin.guildPower().hallAtRiskThreshold(g);
+        int vulnerable = plugin.guildPower().hallVulnerableThreshold(g);
+        if (power <= vulnerable) {
+            hallStatus = "Vulnerable";
+        } else if (power <= atRisk) hallStatus = "At Risk";
+        else hallStatus = "Protected";
+    }
+
+    int unprotected = Math.max(0, expansionUsed - expansionCap);
+    String expansionStatus = unprotected > 0 ? "Vulnerable" : "Protected";
+
+    viewer.sendMessage("§7Bank: §f$" + fmt(g.getBankBalance()));
+    viewer.sendMessage("§7Tax: §f" + g.getTaxPercent() + "%");
+    viewer.sendMessage("§7Next tax: §f" + new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm").format(new java.util.Date(plugin.nextGuildTaxEpochMs())));
+    viewer.sendMessage("§7Allies: §f" + formatGuildList(g.getAllies()));
+    viewer.sendMessage("§7Enemies: §f" + formatGuildList(g.getEnemies()));
+    viewer.sendMessage("§7Guild Hall: §f" + hallUsed + "§7/§f" + hallMax);
+
+    viewer.sendMessage("§7Expansion Claims: §f" + expansionUsed + "§7/§f" + expansionCap + " §7(unprotected: §f" + unprotected + "§7)");
+    viewer.sendMessage("§7Expansion Status: §f" + expansionStatus);
+
+    viewer.sendMessage("§7Hall Status: §f" + hallStatus);
+    viewer.sendMessage("§7Guild Power: §f" + fmt(power) + "§7/§f" + maxPower);
+    viewer.sendMessage("§8§m--------------------------------");
+}
 
     private String formatGuildList(Set<String> ids) {
         if (ids == null || ids.isEmpty()) return "None";
