@@ -1654,8 +1654,8 @@ public final class GuildCommand implements TabExecutor {
         // -------------------------
         if (sub.equals("register")) {
 
-            // Admin-only. Intended for console, Citizens, or admin players.
-            if (!sender.hasPermission("magicera.admin")) {
+            // Admin-only. (Console always allowed if you want it; remove the ConsoleCommandSender part if not.)
+            if (!(sender instanceof org.bukkit.command.ConsoleCommandSender) && !sender.hasPermission("magicera.admin")) {
                 sender.sendMessage("§7[§aGuild§7] §cNo permission.");
                 return true;
             }
@@ -1697,14 +1697,15 @@ public final class GuildCommand implements TabExecutor {
 
             double amount = Math.max(0.0, plugin.getConfig().getDouble("guildRegistration.cost", 0.0));
 
-            boolean hasFunds;
+            // IMPORTANT: balance check matches how your guild tax/bank code reads balances
+            double balance;
             try {
-                hasFunds = econ.has(target, amount);
+                balance = econ.getBalance(target);
             } catch (Throwable t) {
-                hasFunds = target.getName() != null && econ.has(target.getName(), amount);
+                balance = (target.getName() == null) ? 0.0 : econ.getBalance(target.getName());
             }
 
-            if (!hasFunds) {
+            if (balance < amount) {
                 sendRegistrationTargetMessage(target, "registerInsufficientFunds");
                 sender.sendMessage("§7[§aGuild§7] §e" + targetName + " has insufficient funds.");
                 return true;
@@ -1714,8 +1715,8 @@ public final class GuildCommand implements TabExecutor {
             try {
                 r = econ.withdrawPlayer(target, amount);
             } catch (Throwable t) {
-                r = target.getName() == null
-                        ? new EconomyResponse(0.0, 0.0, EconomyResponse.ResponseType.FAILURE, "player has no name")
+                r = (target.getName() == null)
+                        ? new EconomyResponse(0.0, balance, EconomyResponse.ResponseType.FAILURE, "player has no name")
                         : econ.withdrawPlayer(target.getName(), amount);
             }
 
@@ -1735,7 +1736,7 @@ public final class GuildCommand implements TabExecutor {
 
         if (sub.equals("unregister")) {
 
-            if (!sender.hasPermission("magicera.admin")) {
+            if (!(sender instanceof org.bukkit.command.ConsoleCommandSender) && !sender.hasPermission("magicera.admin")) {
                 sender.sendMessage("§7[§aGuild§7] §cNo permission.");
                 return true;
             }
