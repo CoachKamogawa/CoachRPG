@@ -1006,7 +1006,7 @@ public final class GuildCommand implements TabExecutor {
             ParsedCreate parsed = parseCreateArgs(args);
             if (parsed == null) {
                 sender.sendMessage("§cUsage: /guild create \"<name>\" <displayName>");
-                sender.sendMessage("§7Example: §f/guild create \"White Rose\" &aWR");
+                sender.sendMessage("§7Example: §f/guild create \"&c&lFairy &e&lTail\" &cF&eT");
                 return true;
             }
 
