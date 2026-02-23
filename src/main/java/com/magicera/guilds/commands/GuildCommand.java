@@ -2432,7 +2432,7 @@ public final class GuildCommand implements TabExecutor {
     }
 
     private void announceAllyWarEntry(Guild entrant, Guild sideLeader) {
-        Bukkit.broadcastMessage("§7[§aGuild§7] "
+        Bukkit.broadcastMessage("§7[§aMagic Era§7] "
                 + Text.color(entrant.getName())
                 + " §fhas joined the war on the side of "
                 + Text.color(sideLeader.getName())
@@ -2548,7 +2548,7 @@ public final class GuildCommand implements TabExecutor {
         }
 
         if (changed) {
-            Bukkit.broadcastMessage("§7[§aGuild§7] "
+            Bukkit.broadcastMessage("§7[§bMagic Era§7] "
                     + Text.color(newAlly.getName())
                     + " §fhas joined the war on the side of "
                     + Text.color(sideMember.getName())
