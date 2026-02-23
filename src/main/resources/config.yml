@@ -40,9 +40,9 @@ guildRegistration:
   cost: 10000.0
   messages:
     noPermissionCreate: "&7[&aGuild&7] &cYou are not registered to create a guild."
-    registerSuccess: "&7[&aGuild&7] &aYou have been registered and may now create one guild."
-    registerInsufficientFunds: "&7[&aGuild&7] &cYou do not have enough funds for guild registration."
-    registerAlreadyInGuild: "&7[&aGuild&7] &cYou are already in a guild and cannot be registered."
+    registerSuccess: "&7[&aGuild&7] &aYou have registered to create a Guild! You were charged &f$%cost%&a."
+    registerInsufficientFunds: "&7[&aGuild&7] &cYou don't have the funds to register a Guild"
+    registerAlreadyInGuild: "&7[&aGuild&7] &cYou are already in a guild! You must leave if you want to register your own."
     unregisterNotice: "&7[&aGuild&7] &eYour guild creation registration has been revoked."
     vaultMissing: "&7[&aGuild&7] &cVault economy is missing; cannot process registration."
     playerNotFound: "&7[&aGuild&7] &cPlayer not found: &f%player%"
