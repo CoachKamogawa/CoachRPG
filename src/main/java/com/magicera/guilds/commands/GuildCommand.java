@@ -1653,20 +1653,19 @@ public final class GuildCommand implements TabExecutor {
         // REGISTER / UNREGISTER
         // -------------------------
         if (sub.equals("register")) {
-            boolean selfRegister = args.length < 2;
-            if (selfRegister && !(sender instanceof Player)) {
-                sender.sendMessage("§cUsage: /guild register <player>");
-                return true;
-            }
-            if (!selfRegister && !sender.hasPermission("magicera.admin")) {
+            // Admin-only. Intended for Citizens NPC (console) and admin players.
+            if (!sender.hasPermission("magicera.admin")) {
                 sender.sendMessage("§7[§aGuild§7] §cNo permission.");
                 return true;
             }
-            
-            String input = selfRegister ? ((Player) sender).getName() : args[1];
-            OfflinePlayer target = selfRegister
-                    ? (Player) sender
-                    : Bukkit.getOfflinePlayer(input);
+
+            if (args.length < 2) {
+                sender.sendMessage("§7[§aGuild§7] §cUsage: /guild register <player>");
+                return true;
+            }
+
+            String input = args[1];
+            OfflinePlayer target = Bukkit.getOfflinePlayer(input);
             if (target == null || (target.getName() == null && !target.hasPlayedBefore())) {
                 sender.sendMessage(registrationSenderMessage("playerNotFound").replace("%player%", input));
                 return true;
@@ -1674,6 +1673,7 @@ public final class GuildCommand implements TabExecutor {
 
             PlayerData targetPd = plugin.storage().getOrCreatePlayer(target.getUniqueId());
             String targetName = safeName(target.getUniqueId());
+
             if (targetPd.getGuildId() != null) {
                 sendRegistrationTargetMessage(target, "registerAlreadyInGuild");
                 sender.sendMessage("§7[§aGuild§7] §e" + targetName + " is already in a guild. Registration not applied.");
@@ -1702,10 +1702,9 @@ public final class GuildCommand implements TabExecutor {
 
             targetPd.setCanCreateGuild(true);
             plugin.storage().save();
+
             sendRegistrationTargetMessage(target, "registerSuccess");
-            if (!selfRegister || !sender.getName().equalsIgnoreCase(targetName)) {
-                sender.sendMessage("§7[§aGuild§7] §aRegistered §f" + targetName + "§a. Charged §f$" + fmt(amount) + "§a.");
-            }
+            sender.sendMessage("§7[§aGuild§7] §aRegistered §f" + targetName + "§a. Charged §f$" + fmt(amount) + "§a.");
             return true;
         }
 
@@ -1715,7 +1714,7 @@ public final class GuildCommand implements TabExecutor {
                 return true;
             }
             if (args.length < 2) {
-                sender.sendMessage("§cUsage: /guild unregister <player>");
+                sender.sendMessage("§7[§aGuild§7] §cUsage: /guild unregister <player>");
                 return true;
             }
 
