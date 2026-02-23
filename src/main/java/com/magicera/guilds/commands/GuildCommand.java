@@ -2358,14 +2358,14 @@ public final class GuildCommand implements TabExecutor {
         sideA.add(actor.getId());
         sideB.add(target.getId());
 
-        callAlliesToWar(actor, target, actor, warEnd, warSessionId, sideA, sideB);
-        callAlliesToWar(target, actor, actor, warEnd, warSessionId, sideB, sideA);
-
         Bukkit.broadcastMessage("§7[§bMagic Era§7] "
                 + Text.color(actor.getName())
                 + " §fhas declared war against "
                 + Text.color(target.getName())
                 + "§f!");
+        
+        callAlliesToWar(actor, target, actor, warEnd, warSessionId, sideA, sideB);
+        callAlliesToWar(target, actor, actor, warEnd, warSessionId, sideB, sideA);
 
         notifyGuildMaster(target, "§7[§aGuild§7] §cYour guild is now at war with " + Text.color(actor.getName()) + "§c.");
         plugin.guildPower().handlePowerThresholds(actor);
