@@ -16,7 +16,10 @@ public final class PlayerData {
     private String guildTitle;               // nullable / empty ok
     private long lastSeenEpochMs;            // epoch ms (updated on quit, and on join init)
     private boolean guildChatEnabled;
+
+    // Guild creation registration gate
     private boolean canCreateGuild;
+
     private double power;
     private double pendingTaxNoticeAmount;
 
@@ -31,7 +34,9 @@ public final class PlayerData {
         this.guildTitle = "";
         this.lastSeenEpochMs = System.currentTimeMillis();
         this.guildChatEnabled = false;
+
         this.canCreateGuild = false;
+
         this.power = 10.0;
         this.pendingTaxNoticeAmount = 0.0;
         this.pendingGuildMessages = new ArrayList<>();
@@ -59,7 +64,8 @@ public final class PlayerData {
 
     public boolean isGuildChatEnabled() { return guildChatEnabled; }
     public void setGuildChatEnabled(boolean guildChatEnabled) { this.guildChatEnabled = guildChatEnabled; }
-    
+
+    // ---- Registration gate ----
     public boolean canCreateGuild() { return canCreateGuild; }
     public void setCanCreateGuild(boolean canCreateGuild) { this.canCreateGuild = canCreateGuild; }
 
