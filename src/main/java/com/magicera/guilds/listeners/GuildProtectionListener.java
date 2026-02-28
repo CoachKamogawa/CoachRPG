@@ -2,6 +2,7 @@ package com.magicera.guilds.listeners;
 
 import com.magicera.guilds.MagicEraGuildsPlugin;
 import com.magicera.guilds.data.Guild;
+import com.magicera.guilds.data.Party;
 import com.magicera.guilds.data.PlayerData;
 import com.magicera.guilds.util.Text;
 import com.nisovin.magicspells.events.SpellTargetEvent;
