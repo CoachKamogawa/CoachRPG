@@ -2,6 +2,7 @@ maxGuildMembers: 45
 playerPowerMax: 10.0
 playerPowerRegenPerHour: 3.33
 landCostPerChunk: 2.0
+warKillPowerLoss: 1.5
 moveHallCooldownHours: 24
 allowCrossWorldHallMove: false
 hallRequiredAfterHours: 48
