@@ -31,7 +31,7 @@ public final class GuildWarPowerListener implements Listener {
         if (victimGuild == null || killerGuild == null || victimGuild.getId().equals(killerGuild.getId())) return;
         if (!victimGuild.getEnemies().contains(killerGuild.getId()) || !victimGuild.isInWar() || !killerGuild.isInWar()) return;
 
-        double loss = plugin.territoryConfig().getDouble("landCostPerChunk", 2.0);
+        double loss = plugin.territoryConfig().getDouble("warKillPowerLoss", 1.5);
         victimPd.setPower(victimPd.getPower() - loss);
         plugin.guildPower().handlePowerThresholds(victimGuild);
         plugin.storage().save();
