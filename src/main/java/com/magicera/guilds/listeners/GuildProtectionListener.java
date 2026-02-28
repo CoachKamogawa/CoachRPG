@@ -102,7 +102,7 @@ public final class GuildProtectionListener implements Listener {
         Player attacker = asPlayerDamager(event.getDamager());
         if (attacker == null) return;
 
-        if (shouldBlockWarNeutralInteraction(attacker, victim) || shouldBlockFriendlyFire(attacker, victim)) {
+        if (isSameParty(attacker, victim) || shouldBlockWarNeutralInteraction(attacker, victim) || shouldBlockFriendlyFire(attacker, victim)) {
             event.setCancelled(true);
         }
     }
@@ -113,7 +113,7 @@ public final class GuildProtectionListener implements Listener {
         Player attacker = asPlayerDamager(event.getCombuster());
         if (attacker == null) return;
 
-        if (shouldBlockWarNeutralInteraction(attacker, victim) || shouldBlockFriendlyFire(attacker, victim)) {
+        if (isSameParty(attacker, victim) || shouldBlockWarNeutralInteraction(attacker, victim) || shouldBlockFriendlyFire(attacker, victim)) {
             event.setCancelled(true);
         }
     }
@@ -123,6 +123,17 @@ public final class GuildProtectionListener implements Listener {
         if (!(event.getTarget() instanceof Player victim)) return;
         if (!(event.getSpellData().caster() instanceof Player caster)) return;
         if (caster.getUniqueId().equals(victim.getUniqueId())) return;
+
+        if (isSameParty(caster, victim)) {
+            String internalName = event.getSpell().getInternalName().toLowerCase();
+            boolean positive = internalName.contains("heal") || internalName.contains("buff") || internalName.contains("regen")
+                    || internalName.contains("cleanse") || internalName.contains("cure") || internalName.contains("shield");
+            if (!positive) {
+                event.setCancelled(true);
+                event.setCastCancelled(true);
+            }
+            return;
+        }
 
         if (shouldBlockWarNeutralInteraction(caster, victim)) {
             event.setCancelled(true);
@@ -134,7 +145,8 @@ public final class GuildProtectionListener implements Listener {
         if (!shouldBlockFriendlyFire(caster, victim)) return;
 
         String internalName = event.getSpell().getInternalName().toLowerCase();
-        boolean positive = internalName.contains("heal") || internalName.contains("buff") || internalName.contains("regen");
+        boolean positive = internalName.contains("heal") || internalName.contains("buff") || internalName.contains("regen")
+                || internalName.contains("cleanse") || internalName.contains("cure") || internalName.contains("shield");
         if (!positive) {
             event.setCancelled(true);
             event.setCastCancelled(true);
@@ -207,6 +219,13 @@ public final class GuildProtectionListener implements Listener {
         if (entity instanceof Player p) return p;
         if (entity instanceof Projectile proj && proj.getShooter() instanceof Player p) return p;
         return null;
+    }
+
+    private boolean isSameParty(Player a, Player b) {
+        Party ap = plugin.storage().getPartyByMember(a.getUniqueId());
+        if (ap == null) return false;
+        Party bp = plugin.storage().getPartyByMember(b.getUniqueId());
+        return bp != null && ap.getId().equals(bp.getId());
     }
 
     private boolean shouldBlockWarNeutralInteraction(Player a, Player b) {
