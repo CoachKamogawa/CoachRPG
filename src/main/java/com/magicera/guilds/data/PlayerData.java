@@ -22,6 +22,8 @@ public final class PlayerData {
 
     private double power;
     private double pendingTaxNoticeAmount;
+    private int pvpKills;
+    private int pvpDeaths;
 
     // Offline guild chat / notifications
     private final List<String> pendingGuildMessages;
@@ -39,6 +41,8 @@ public final class PlayerData {
 
         this.power = 10.0;
         this.pendingTaxNoticeAmount = 0.0;
+        this.pvpKills = 0;
+        this.pvpDeaths = 0;
         this.pendingGuildMessages = new ArrayList<>();
     }
 
@@ -80,4 +84,12 @@ public final class PlayerData {
     }
 
     public List<String> getPendingGuildMessages() { return pendingGuildMessages; }
+
+    public int getPvpKills() { return pvpKills; }
+    public void setPvpKills(int pvpKills) { this.pvpKills = Math.max(0, pvpKills); }
+    public void incrementPvpKills() { this.pvpKills++; }
+
+    public int getPvpDeaths() { return pvpDeaths; }
+    public void setPvpDeaths(int pvpDeaths) { this.pvpDeaths = Math.max(0, pvpDeaths); }
+    public void incrementPvpDeaths() { this.pvpDeaths++; }
 }
