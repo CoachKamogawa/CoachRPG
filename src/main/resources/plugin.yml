@@ -8,18 +8,9 @@ commands:
   guild:
     description: Guild commands
     usage: /guild
-  favor:
-    description: Favor
-    usage: /favor 
-
-permissions:
-  magicera.admin:
-    default: op
-  shieldcd.admin:
-    default: op
 
   party:
-    description: Party command
+    description: Party commands
     usage: /party
     permission: magicera.party.use
 
