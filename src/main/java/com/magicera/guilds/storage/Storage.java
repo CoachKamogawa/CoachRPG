@@ -3,6 +3,7 @@ package com.magicera.guilds.storage;
 import com.magicera.guilds.data.Guild;
 import com.magicera.guilds.data.GuildAlignment;
 import com.magicera.guilds.data.GuildRole;
+import com.magicera.guilds.data.Party;
 import com.magicera.guilds.data.PlayerData;
 import com.magicera.guilds.util.Text;
 import org.bukkit.configuration.ConfigurationSection;
@@ -23,11 +24,17 @@ public final class Storage {
 
     private File guildsFile;
     private File playersFile;
+    private File partiesFile;
+
     private YamlConfiguration guildsYaml;
     private YamlConfiguration playersYaml;
+    private YamlConfiguration partiesYaml;
 
     private final Map<String, Guild> guildsById = new HashMap<>();
     private final Map<UUID, PlayerData> playersById = new HashMap<>();
+
+    private final Map<String, Party> partiesById = new HashMap<>();
+    private final Map<UUID, String> partyIdByMember = new HashMap<>();
 
     // Single-writer guard for file IO (prevents overlapping saves from multiple call sites).
     private final ReentrantLock saveLock = new ReentrantLock();
@@ -56,12 +63,16 @@ public final class Storage {
 
         guildsFile = new File(plugin.getDataFolder(), "guilds.yml");
         playersFile = new File(plugin.getDataFolder(), "players.yml");
+        partiesFile = new File(plugin.getDataFolder(), "parties.yml");
 
         guildsYaml = YamlConfiguration.loadConfiguration(guildsFile);
         playersYaml = YamlConfiguration.loadConfiguration(playersFile);
+        partiesYaml = YamlConfiguration.loadConfiguration(partiesFile);
 
         guildsById.clear();
         playersById.clear();
+        partiesById.clear();
+        partyIdByMember.clear();
 
         // Load guilds
         ConfigurationSection gSec = guildsYaml.getConfigurationSection("guilds");
@@ -266,6 +277,44 @@ public final class Storage {
             }
         }
 
+        // Load parties
+        ConfigurationSection partySec = partiesYaml.getConfigurationSection("parties");
+        if (partySec != null) {
+            for (String partyId : partySec.getKeys(false)) {
+                ConfigurationSection s = partySec.getConfigurationSection(partyId);
+                if (s == null) continue;
+
+                String name = s.getString("name", partyId);
+                String leaderStr = s.getString("leader", null);
+                long createdAt = s.getLong("createdAtEpochMs", System.currentTimeMillis());
+
+                UUID leader = null;
+                try {
+                    if (leaderStr != null) leader = UUID.fromString(leaderStr);
+                } catch (IllegalArgumentException ignored) {
+                }
+                if (leader == null) continue;
+
+                Party party = new Party(partyId, name, leader, createdAt);
+
+                List<String> members = s.getStringList("members");
+                if (members != null) {
+                    for (String mStr : members) {
+                        try {
+                            UUID m = UUID.fromString(mStr);
+                            party.getMembers().add(m);
+                        } catch (IllegalArgumentException ignored) {
+                        }
+                    }
+                }
+
+                partiesById.put(partyId, party);
+                for (UUID m : party.getMembers()) {
+                    partyIdByMember.put(m, partyId);
+                }
+            }
+        }
+
         // After a clean load, treat state as clean.
         dirty = false;
     }
@@ -281,9 +330,11 @@ public final class Storage {
         try {
             if (guildsYaml == null) guildsYaml = new YamlConfiguration();
             if (playersYaml == null) playersYaml = new YamlConfiguration();
+            if (partiesYaml == null) partiesYaml = new YamlConfiguration();
 
             guildsYaml.set("guilds", null);
             playersYaml.set("players", null);
+            partiesYaml.set("parties", null);
 
             for (Guild g : guildsById.values()) {
                 String base = "guilds." + g.getId();
@@ -427,8 +478,22 @@ public final class Storage {
                 playersYaml.set(base + ".pendingGuildMessages", new ArrayList<>(p.getPendingGuildMessages()));
             }
 
+            for (Party party : partiesById.values()) {
+                String base = "parties." + party.getId();
+                partiesYaml.set(base + ".name", party.getName());
+                partiesYaml.set(base + ".leader", party.getLeader() == null ? null : party.getLeader().toString());
+                partiesYaml.set(base + ".createdAtEpochMs", party.getCreatedAtEpochMs());
+
+                List<String> members = new ArrayList<>();
+                for (UUID m : party.getMembers()) {
+                    members.add(m.toString());
+                }
+                partiesYaml.set(base + ".members", members);
+            }
+
             atomicSaveYaml(guildsYaml, guildsFile, "guilds.yml");
             atomicSaveYaml(playersYaml, playersFile, "players.yml");
+            atomicSaveYaml(partiesYaml, partiesFile, "parties.yml");
 
             success = true;
         } catch (Exception e) {
@@ -469,6 +534,53 @@ public final class Storage {
             Files.move(tmpPath, target, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
         } catch (AtomicMoveNotSupportedException ex) {
             Files.move(tmpPath, target, StandardCopyOption.REPLACE_EXISTING);
+        }
+    }
+
+    // -------------------------
+    // PARTIES
+    // -------------------------
+    public Party getPartyByMember(UUID uuid) {
+        if (uuid == null) return null;
+        String partyId = partyIdByMember.get(uuid);
+        if (partyId == null) return null;
+        return partiesById.get(partyId);
+    }
+
+    public Party getPartyById(String id) {
+        if (id == null) return null;
+        return partiesById.get(id);
+    }
+
+    public Collection<Party> allParties() {
+        return Collections.unmodifiableCollection(partiesById.values());
+    }
+
+    public void addParty(Party party) {
+        if (party == null) return;
+
+        Party existing = partiesById.get(party.getId());
+        if (existing != null) {
+            for (UUID m : existing.getMembers()) {
+                partyIdByMember.remove(m);
+            }
+        }
+
+        partiesById.put(party.getId(), party);
+        for (UUID m : party.getMembers()) {
+            partyIdByMember.put(m, party.getId());
+        }
+        dirty = true;
+    }
+
+    public void removeParty(String partyId) {
+        if (partyId == null) return;
+        Party removed = partiesById.remove(partyId);
+        if (removed != null) {
+            for (UUID m : removed.getMembers()) {
+                partyIdByMember.remove(m);
+            }
+            dirty = true;
         }
     }
 
@@ -533,8 +645,13 @@ public final class Storage {
     public void clearAllData() {
         guildsById.clear();
         playersById.clear();
+        partiesById.clear();
+        partyIdByMember.clear();
+
         guildsYaml = new YamlConfiguration();
         playersYaml = new YamlConfiguration();
+        partiesYaml = new YamlConfiguration();
+
         dirty = true;
     }
 }
