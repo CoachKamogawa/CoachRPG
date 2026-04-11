@@ -31,12 +31,13 @@ public final class PartyCommand implements CommandExecutor {
             return true;
         }
         if (args.length == 0) {
-            player.sendMessage(prefix() + "Usage: /party <create|invite|join|promote|kick|leave|disband|info|leaderboard|summon>");
+            sendHelp(player, label);
             return true;
         }
 
         String sub = args[0].toLowerCase(Locale.ROOT);
         switch (sub) {
+            case "help", "?" -> sendHelp(player, label);
             case "create" -> createParty(player, args);
             case "invite" -> invite(player, args);
             case "join" -> join(player, args);
@@ -47,7 +48,10 @@ public final class PartyCommand implements CommandExecutor {
             case "info" -> info(player, args);
             case "leaderboard" -> leaderboard(player);
             case "summon" -> summon(player, args);
-            default -> player.sendMessage(prefix() + "Unknown subcommand.");
+            default -> {
+                player.sendMessage(prefix() + "Unknown subcommand.");
+                sendHelp(player, label);
+            }
         }
         return true;
     }
@@ -157,7 +161,7 @@ public final class PartyCommand implements CommandExecutor {
             player.sendMessage(prefix() + "Failed to join party.");
             return;
         }
-        plugin.storage().markDirty();
+        plugin.storage().addPartyMember(party.getId(), player.getUniqueId());
         pendingInviteByPlayer.remove(player.getUniqueId());
         broadcastParty(party, player.getName() + " joined the party.");
     }
@@ -209,7 +213,7 @@ public final class PartyCommand implements CommandExecutor {
             leader.sendMessage(prefix() + "That player is not in your party.");
             return;
         }
-        plugin.storage().markDirty();
+        plugin.storage().removePartyMember(target.getUniqueId());
         broadcastParty(party, target.getName() + " was kicked from the party.");
     }
 
@@ -224,7 +228,7 @@ public final class PartyCommand implements CommandExecutor {
             return;
         }
         if (party.removeMember(player.getUniqueId())) {
-            plugin.storage().markDirty();
+            plugin.storage().removePartyMember(player.getUniqueId());
             player.sendMessage(prefix() + "You left the party.");
             broadcastParty(party, player.getName() + " left the party.");
         }
@@ -356,6 +360,25 @@ public final class PartyCommand implements CommandExecutor {
 
     private String prefix() {
         return Text.color("&7[&dParty&7] ");
+    }
+    
+    private void sendHelp(Player player, String label) {
+        String root = "/" + label.toLowerCase(Locale.ROOT);
+        player.sendMessage("§8§m----------------------------------------");
+        player.sendMessage(prefix() + "§fParty Commands");
+        player.sendMessage("§d" + root + " create §7<name> §8- §fCreate a new party.");
+        player.sendMessage("§d" + root + " invite §7<player> §8- §fInvite a player.");
+        player.sendMessage("§d" + root + " join §7<leader> §8- §fAccept an invite.");
+        player.sendMessage("§d" + root + " promote §7<player> §8- §fTransfer party leadership.");
+        player.sendMessage("§d" + root + " kick §7<player> §8- §fRemove a member.");
+        player.sendMessage("§d" + root + " leave §8- §fLeave your current party.");
+        player.sendMessage("§d" + root + " disband §8- §fDisband your party.");
+        player.sendMessage("§d" + root + " info §7[party|player] §8- §fShow party details.");
+        player.sendMessage("§d" + root + " leaderboard §8- §fShow top party KDA.");
+        if (player.hasPermission("magicera.admin")) {
+            player.sendMessage("§d" + root + " summon §7<player> §8- §fTeleport party to leader.");
+        }
+        player.sendMessage("§8§m----------------------------------------");
     }
 
     private String formatKda(int kills, int deaths) {
