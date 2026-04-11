@@ -583,6 +583,19 @@ public final class Storage {
             dirty = true;
         }
     }
+    
+    public void addPartyMember(String partyId, UUID memberId) {
+        if (partyId == null || memberId == null) return;
+        partyIdByMember.put(memberId, partyId);
+        dirty = true;
+    }
+
+    public void removePartyMember(UUID memberId) {
+        if (memberId == null) return;
+        if (partyIdByMember.remove(memberId) != null) {
+            dirty = true;
+        }
+    }
 
     public PlayerData getOrCreatePlayer(UUID uuid) {
         PlayerData existing = playersById.get(uuid);
