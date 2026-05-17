@@ -3,6 +3,7 @@ main: com.magicera.guilds.MagicEraGuildsPlugin
 version: 1.0.0
 api-version: 1.21
 author: Coach Kamogawa
+softdepend: [CoachRename]
 
 commands:
   guild:
