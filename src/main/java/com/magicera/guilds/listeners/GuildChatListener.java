@@ -34,7 +34,7 @@ public final class GuildChatListener implements Listener {
         String memberTitle = pd.getGuildTitle();
         String titlePart = memberTitle.isEmpty() ? "" : "§8[§r" + Text.color(memberTitle) + "§8]§r ";
         String guildPart = "§7[§aGuild§7] §8[" + guild.getPrefix() + "§8]§r ";
-        String msg = guildPart + titlePart + player.getName() + "§7: §f" + event.getMessage();
+        String msg = guildPart + titlePart + plugin.names().displayName(player) + "§7: §f" + event.getMessage();
 
         for (Player online : Bukkit.getOnlinePlayers()) {
             PlayerData target = plugin.storage().getOrCreatePlayer(online.getUniqueId());
