@@ -19,6 +19,7 @@ import com.magicera.guilds.listeners.GuildWarPowerListener;
 import com.magicera.guilds.listeners.PlayerSeenListener;
 import com.magicera.guilds.listeners.PvpKdaListener;
 import com.magicera.guilds.storage.Storage;
+import com.magicera.guilds.util.NicknameService;
 import net.milkbowl.vault.economy.Economy;
 import net.milkbowl.vault.economy.EconomyResponse;
 import org.bukkit.Bukkit;
@@ -47,6 +48,7 @@ public final class MagicEraGuildsPlugin extends JavaPlugin {
     private VaultManager vaults;
     private VaultLogManager vaultLogs;
     private GuildPowerService guildPower;
+    private NicknameService nicknameService;
 
     private EconomyHook economyHook;
     private File territoryFile;
@@ -68,6 +70,7 @@ public final class MagicEraGuildsPlugin extends JavaPlugin {
     public VaultLogManager vaultLogs() { return vaultLogs; }
     public EconomyHook economy() { return economyHook; }
     public GuildPowerService guildPower() { return guildPower; }
+    public NicknameService names() { return nicknameService; }
     public FileConfiguration territoryConfig() { return territoryConfig == null ? getConfig() : territoryConfig; }
     public long nextGuildTaxEpochMs() { return nextGuildTaxEpochMs; }
 
@@ -82,9 +85,11 @@ public final class MagicEraGuildsPlugin extends JavaPlugin {
             inviteManager = new InviteManager(this);
             vaults = new VaultManager(this);
             vaultLogs = new VaultLogManager(this);
-
+            nicknameService = new NicknameService();
+            nicknameService.hook();
             economyHook = new EconomyHook();
             guildPower = new GuildPowerService(this);
+            
             boolean econOk = economyHook.setup();
 
             // Commands
@@ -111,6 +116,7 @@ public final class MagicEraGuildsPlugin extends JavaPlugin {
             getLogger().info("Author: Coach Kamogawa");
             getLogger().info("Guilds loaded: " + storage.allGuilds().size());
             getLogger().info("Economy: " + (econOk ? "Vault hooked" : "DISABLED (Vault/Economy missing)"));
+            getLogger().info("CoachRename: " + (nicknameService != null && nicknameService.hooked() ? "hooked" : "not found"));
             getLogger().info("====================================");
 
             if (!econOk) {
