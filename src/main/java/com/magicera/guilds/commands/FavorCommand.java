@@ -66,7 +66,7 @@ public final class FavorCommand implements CommandExecutor {
             pd.setAlignmentScore(score);
             plugin.storage().save();
 
-            sender.sendMessage("§7[§6Favor§7] §aSet §f" + target.getName() + "§a Favor to §f" + score + "§a.");
+            sender.sendMessage("§7[§6Favor§7] §aSet §f" + plugin.names().displayName(target) + "§a Favor to §f" + score + "§a.");
             target.sendMessage("§7[§6Favor§7] §fYour Favor is now §f" + score + "§f.");
             if (plugin.alignmentWatcher() != null) plugin.alignmentWatcher().checkAndWarn(target, false);
             return true;
@@ -98,7 +98,7 @@ public final class FavorCommand implements CommandExecutor {
             pd.setAlignmentScore(newScore);
             plugin.storage().save();
 
-            sender.sendMessage("§7[§6Favor§7] §aAdded §f" + add + "§a Favor to §f" + target.getName() + "§a. New: §f" + newScore);
+            sender.sendMessage("§7[§6Favor§7] §aAdded §f" + add + "§a Favor to §f" + plugin.names().displayName(target) + "§a. New: §f" + newScore);
             target.sendMessage("§7[§6Favor§7] §fYour Favor changed by §f" + add + "§f. New: §f" + newScore);
             if (plugin.alignmentWatcher() != null) plugin.alignmentWatcher().checkAndWarn(target, false);
             return true;
