@@ -1009,7 +1009,7 @@ public final class GuildCommand implements TabExecutor {
 
             ParsedCreate parsed = parseCreateArgs(args);
             if (parsed == null) {
-                sender.sendMessage("§cUsage: /guild create \"<name>\" <displayName>");
+                sender.sendMessage("§cUsage: /guild create <name> <tag>");
                 sender.sendMessage("§7Example: §f/guild create \"&c&lFairy &e&lTail\" &cF&eT");
                 return true;
             }
@@ -2913,30 +2913,32 @@ private String formatGuildList(Set<String> ids) {
     }
 
     private ParsedCreate parseCreateArgs(String[] args) {
-        // Expected: /guild create "<name with spaces>" <displayName>
+    // Supports:
+    // /guild create &b&lWhite &d&lRose &bW&dR
+    // /guild create "&b&lWhite &d&lRose" &bW&dR
         if (args.length < 3) return null;
 
-        // If name isn't quoted, accept /guild create name prefix
-        String joined = String.join(" ", Arrays.copyOfRange(args, 1, args.length));
+        String joined = String.join(" ", Arrays.copyOfRange(args, 1, args.length)).trim();
         String name;
         String prefix;
 
         int firstQuote = joined.indexOf('"');
         int secondQuote = firstQuote >= 0 ? joined.indexOf('"', firstQuote + 1) : -1;
 
-        if (firstQuote >= 0 && secondQuote > firstQuote) {
+        if (firstQuote == 0 && secondQuote > firstQuote) {
             name = joined.substring(firstQuote + 1, secondQuote).trim();
+
             String after = joined.substring(secondQuote + 1).trim();
             if (after.isEmpty()) return null;
-            prefix = after.split("\\s+")[0];
+
+            prefix = after.split("\\s+")[0].trim();
         } else {
-            // fallback: name is args[1], prefix is args[2]
-            if (args.length < 3) return null;
-            name = args[1];
-            prefix = args[2];
+        // Unquoted format: last argument is the tag, everything before it is the guild name.
+            prefix = args[args.length - 1].trim();
+            name = String.join(" ", Arrays.copyOfRange(args, 1, args.length - 1)).trim();
         }
 
-        if (name == null || name.isBlank() || prefix == null || prefix.isBlank()) return null;
+        if (name.isBlank() || prefix.isBlank()) return null;
         return new ParsedCreate(name, prefix);
     }
 
