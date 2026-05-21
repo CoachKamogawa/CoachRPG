@@ -1125,7 +1125,7 @@ public final class GuildCommand implements TabExecutor {
 
             plugin.inviteManager().setInvite(target.getUniqueId(), guild.getId(), inviter.getUniqueId());
 
-            sender.sendMessage("§7[§aGuild§7] §aInvited §f" + target.getName() + " §ato §r" + Text.color(guild.getName()) + " §7[" + guild.getPrefix() + "§7]");
+            sender.sendMessage("§7[§aGuild§7] §aInvited §f" + plugin.names().displayName(target) + " §ato §r" + Text.color(guild.getName()) + " §7[" + guild.getPrefix() + "§7]");
             target.sendMessage("§7[§aGuild§7] §fYou were invited to join §r" + Text.color(guild.getName()) + " §7[" + guild.getPrefix() + "§7]");
             target.sendMessage("§7Type §a/guild accept §7or §c/guild deny");
             return true;
@@ -1164,7 +1164,7 @@ public final class GuildCommand implements TabExecutor {
                 plugin.inviteManager().clearInvite(player);
                 sender.sendMessage("§7[§aGuild§7] §7Invite declined.");
                 Player inviter = Bukkit.getPlayer(inv.inviter);
-                if (inviter != null) inviter.sendMessage("§7[§aGuild§7] §c" + player.getName() + " declined the guild invite.");
+                if (inviter != null) inviter.sendMessage("§7[§aGuild§7] §c" + plugin.names().displayName(player) + " declined the guild invite.");
                 return true;
             }
 
@@ -1193,14 +1193,14 @@ public final class GuildCommand implements TabExecutor {
             pd.setGuildId(guild.getId());
             pd.setOutOfAlignmentSinceEpochMs(null);
             guild.setRole(player.getUniqueId(), GuildRole.MEMBER);
-            guild.addLogEntry("Member joined: " + player.getName());
+            guild.addLogEntry("Member joined: " + plugin.names().plainName(player));
             plugin.guildPower().handlePowerThresholds(guild);
 
             plugin.inviteManager().clearInvite(player);
             plugin.storage().save();
 
             sender.sendMessage("§7[§aGuild§7] §aYou joined §r" + Text.color(guild.getName()) + " §7[" + guild.getPrefix() + "§7]");
-            Bukkit.broadcastMessage("§7[§bMagic Era§7] §f" + player.getName() + " has joined " + Text.color(guild.getName()) + "§f.");
+            Bukkit.broadcastMessage("§7[§bMagic Era§7] §f" + plugin.names().displayName(player) + " has joined " + Text.color(guild.getName()) + "§f.");
 
             if (plugin.alignmentWatcher() != null) {
                 plugin.alignmentWatcher().checkAndWarn(player, false);
@@ -1241,7 +1241,7 @@ public final class GuildCommand implements TabExecutor {
             pd.setGuildId(null);
             pd.setGuildTitle("");
             pd.setOutOfAlignmentSinceEpochMs(null);
-            guild.addLogEntry("Member left: " + player.getName());
+            guild.addLogEntry("Member left: " + plugin.names().plainName(player));
             plugin.guildPower().handlePowerThresholds(guild);
             plugin.storage().save();
 
@@ -1350,7 +1350,7 @@ public final class GuildCommand implements TabExecutor {
                 targetPd.setGuildTitle("");
                 targetPd.setOutOfAlignmentSinceEpochMs(null);
             }
-            guild.addLogEntry("Kick: " + safeName(targetId) + " by " + player.getName());
+            guild.addLogEntry("Kick: " + safeName(targetId) + " by " + plugin.names().plainName(player));
             plugin.guildPower().handlePowerThresholds(guild);
             plugin.storage().save();
 
@@ -1458,7 +1458,7 @@ public final class GuildCommand implements TabExecutor {
 
             guild.setRole(player.getUniqueId(), GuildRole.MEMBER);
             guild.setRole(targetId, GuildRole.MASTER);
-            guild.addLogEntry("Master transferred: " + player.getName() + " -> " + safeName(targetId));
+            guild.addLogEntry("Master transferred: " + plugin.names().plainName(player) + " -> " + safeName(targetId));
             plugin.storage().save();
 
             String targetName = Bukkit.getOfflinePlayer(targetId).getName();
@@ -1576,7 +1576,7 @@ public final class GuildCommand implements TabExecutor {
             for (UUID memberId : guild.getMembers().keySet()) {
                 Player online = Bukkit.getPlayer(memberId);
                 if (online != null) {
-                    online.sendMessage("§7[§aGuild§7] §f" + player.getName() + " has initiated an impeachment.");
+                    online.sendMessage("§7[§aGuild§7] §f" + plugin.names().displayName(player) + " has initiated an impeachment.");
                     online.sendMessage("§7[§aGuild§7] §fYou must vote: /guild impeach <remove|keep>");
                     online.playSound(online.getLocation(), Sound.ENTITY_WITHER_SPAWN, 1f, 1f);
                 }
@@ -2966,10 +2966,7 @@ private String formatGuildList(Set<String> ids) {
     }
 
     private String safeName(UUID id) {
-        if (id == null) return "Unknown";
-        OfflinePlayer off = Bukkit.getOfflinePlayer(id);
-        String n = off == null ? null : off.getName();
-        return (n == null || n.isBlank()) ? id.toString() : n;
+        return plugin.names().displayName(id);
     }
 
     private double parseMoney(String raw) {
