@@ -1200,7 +1200,7 @@ public final class GuildCommand implements TabExecutor {
             plugin.storage().save();
 
             sender.sendMessage("§7[§aGuild§7] §aYou joined §r" + Text.color(guild.getName()) + " §7[" + guild.getPrefix() + "§7]");
-            Bukkit.broadcastMessage("§7[§bMagic Era§7] §f" + plugin.names().displayName(player) + " has joined " + Text.color(guild.getName()) + "§f.");
+            Bukkit.broadcastMessage("§7[§bMagic Era§7] §f" + plugin.names().displayName(player) + "§f has joined " + Text.color(guild.getName()) + "§f.");
 
             if (plugin.alignmentWatcher() != null) {
                 plugin.alignmentWatcher().checkAndWarn(player, false);
