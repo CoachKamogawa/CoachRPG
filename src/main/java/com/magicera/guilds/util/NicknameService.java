@@ -123,11 +123,11 @@ public final class NicknameService {
 
         try {
             Object result = getDisplayNameMethod.invoke(nicknameManager, uuid, realUsername);
-            return result instanceof String value && !value.isBlank() ? value : realUsername;
+            return result instanceof String value && !value.isBlank() ? Text.color(value) : realUsername;
         } catch (ReflectiveOperationException ignored) {
             return realUsername;
-        }
     }
+}
 
     private String plainName(UUID uuid, String realUsername) {
         if (!hooked()) return realUsername;
