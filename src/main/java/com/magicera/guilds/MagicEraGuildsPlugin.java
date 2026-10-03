@@ -18,6 +18,7 @@ import com.magicera.guilds.listeners.GuildProtectionListener;
 import com.magicera.guilds.listeners.GuildWarPowerListener;
 import com.magicera.guilds.listeners.PlayerSeenListener;
 import com.magicera.guilds.listeners.PvpKdaListener;
+import com.magicera.guilds.listeners.GuildPublicChatListener;
 import com.magicera.guilds.storage.Storage;
 import com.magicera.guilds.util.NicknameService;
 import net.milkbowl.vault.economy.Economy;
@@ -102,6 +103,9 @@ public final class MagicEraGuildsPlugin extends JavaPlugin {
             Bukkit.getPluginManager().registerEvents(new MenuListener(this), this);
             Bukkit.getPluginManager().registerEvents(new PlayerSeenListener(this), this);
             Bukkit.getPluginManager().registerEvents(new GuildChatListener(this), this);
+            Bukkit.getPluginManager().registerEvents(
+                    new GuildPublicChatListener(this), this
+            );
             Bukkit.getPluginManager().registerEvents(new GuildProtectionListener(this), this);
             Bukkit.getPluginManager().registerEvents(new GuildWarPowerListener(this), this);
             Bukkit.getPluginManager().registerEvents(new PvpKdaListener(this), this);
